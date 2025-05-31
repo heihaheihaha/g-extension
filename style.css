@@ -1,0 +1,18 @@
+body {
+  width: 300px;
+  font-family: sans-serif;
+  padding: 10px;
+}
+#summarizeButton {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+#summaryOutput {
+  white-space: pre-wrap; /* Preserve formatting of the summary */
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  padding: 5px;
+  min-height: 50px; /* So it's visible when empty or showing 'Summarizing...' */
+}
