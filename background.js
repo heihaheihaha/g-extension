@@ -1,77 +1,94 @@
-// IMPORTANT: Store your API key securely.
-// Ideally, prompt the user for it or use chrome.storage.sync.
-// For this example, it's hardcoded, which is NOT recommended for production.
-const GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY'; // Replace with your actual key
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+// background.js
+let geminiApiKey = null;
 
-chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-  if (request.action === "summarize") {
-    // Get the current active tab
-    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-      if (tabs.length === 0) {
-        sendResponse({ error: "No active tab found." });
-        return true; // Indicates asynchronous response
+async function loadApiKey() {
+  try {
+    const result = await chrome.storage.sync.get(['geminiApiKey']);
+    if (result.geminiApiKey) {
+      geminiApiKey = result.geminiApiKey;
+      console.log("Background: Gemini API Key loaded.");
+    } else {
+      console.warn("Background: Gemini API Key not found in storage.");
+    }
+  } catch (e) {
+    console.error("Background: Error loading API Key:", e);
+  }
+}
+
+// Load API key when the background script starts
+loadApiKey();
+
+// Listen for API Key changes from options page
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'sync' && changes.geminiApiKey) {
+    geminiApiKey = changes.geminiApiKey.newValue;
+    console.log("Background: Gemini API Key updated.");
+  }
+});
+
+// Handle browser action click (plugin icon)
+chrome.action.onClicked.addListener((tab) => {
+  if (tab.id) {
+    chrome.tabs.sendMessage(tab.id, { action: 'toggleSidebar' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.warn("Background: Could not send toggleSidebar message to content script:", chrome.runtime.lastError.message);
+        // This might happen on pages like chrome://extensions or new tab page where content scripts don't run.
+      } else if (response) {
+        // console.log("Background: Sidebar toggle response:", response);
       }
-      const activeTab = tabs[0];
+    });
+  } else {
+    console.error("Background: Tab ID not found for action click.");
+  }
+});
 
-      // Inject the content script to get page content
-      chrome.scripting.executeScript({
-        target: { tabId: activeTab.id },
-        function: getPageTextContent // This function will run in the content script's context
-      }, async (injectionResults) => {
-        if (chrome.runtime.lastError || !injectionResults || injectionResults.length === 0) {
-          sendResponse({ error: "Failed to get page content: " + (chrome.runtime.lastError ? chrome.runtime.lastError.message : "No result") });
-          return true;
+// Listen for messages from content_script.js or sidebar.js
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // console.log("Background: Received message", request);
+  if (request.action === "getAndSummarizePage") {
+    // This message comes from sidebar.js, asking background to get content from content_script.js
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs || tabs.length === 0 || !tabs[0].id) {
+        console.error("Background (getAndSummarizePage): No active tab found or tab ID missing.");
+        sendResponse({ error: "无法确定活动标签页。" });
+        return;
+      }
+      const activeTabId = tabs[0].id;
+
+      // Send message to content_script.js to get the page content
+      chrome.tabs.sendMessage(activeTabId, { action: "getPageContentForSummarize" }, (pageResponse) => {
+        if (chrome.runtime.lastError) {
+          console.error("Background (getAndSummarizePage): Error messaging content script:", chrome.runtime.lastError.message);
+          sendResponse({ error: "获取页面内容失败 (CS通讯错误): " + chrome.runtime.lastError.message });
+          return;
         }
 
-        const pageContent = injectionResults[0].result;
-        if (!pageContent) {
-          sendResponse({ error: "No content found on the page." });
-          return true;
-        }
-
-        // Make the API call to Gemini
-        try {
-          const response = await fetch(GEMINI_API_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              "contents": [{
-                "parts": [{
-                  "text": `Please summarize the following text:\n\n${pageContent}`
-                }]
-              }]
-            })
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Gemini API Error:', errorData);
-            sendResponse({ error: `API Error: ${errorData.error?.message || response.statusText}` });
-            return true;
-          }
-
-          const data = await response.json();
-          // Assuming the Gemini API response structure for summarization.
-          // You'll need to adjust this based on the actual API response.
-          const summary = data.candidates[0]?.content?.parts[0]?.text || "No summary available.";
-          sendResponse({ summary: summary });
-
-        } catch (error) {
-          console.error('Error calling Gemini API:', error);
-          sendResponse({ error: 'Failed to summarize: ' + error.message });
+        // pageResponse is from content_script.js. It should be { contentForSummary: "..." }
+        if (pageResponse && typeof pageResponse.contentForSummary === 'string') {
+          // Successfully got content (or empty string if page has no text)
+          sendResponse({ contentForSummary: pageResponse.contentForSummary }); // Forward to sidebar.js
+        } else {
+          // content_script.js didn't send the expected structure, or contentForSummary was not a string.
+          console.warn("Background (getAndSummarizePage): Invalid response from content script:", pageResponse);
+          sendResponse({ error: "未能从页面获取内容 (CS数据无效或格式错误)。" });
         }
       });
     });
     return true; // Indicates that the response will be sent asynchronously
   }
+
+  // Handle other actions if needed
+  // For example, if API calls were to be proxied through background for security:
+  // if (request.action === "callGeminiAPI_viaBackground") {
+  //   if (!geminiApiKey) {
+  //     sendResponse({ error: "API Key not set in background." });
+  //     return true;
+  //   }
+  //   // ... (make fetch call here) ...
+  //   return true; // Async
+  // }
+
+  return false; // Default for synchronous messages or if no handler matches
 });
 
-// This function will be injected into the active tab to get its text content
-function getPageTextContent() {
-  // You can use more sophisticated methods here to get cleaner text,
-  // e.g., using readability libraries or targeting specific HTML elements.
-  return document.body.innerText;
-}
+console.log("Background script (gemini-sidebar) started.");

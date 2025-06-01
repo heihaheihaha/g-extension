@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>智能侧边栏设置</title>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: auto; }
+    label { display: block; margin-bottom: 8px; font-weight: bold; }
+    input[type="text"] { width: 100%; padding: 8px; margin-bottom: 15px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;}
+    button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background-color: #0056b3; }
+    #status { margin-top: 15px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>设置</h1>
+  <div>
+    <label for="apiKey">Gemini API 密钥:</label>
+    <input type="text" id="apiKey" name="apiKey" placeholder="在此处粘贴您的 Gemini API 密钥">
+  </div>
+  <button id="saveButton">保存密钥</button>
+  <p id="status"></p>
+  <script src="options.js"></script>
+</body>
+</html>
