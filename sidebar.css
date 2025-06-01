@@ -4,16 +4,16 @@ body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column
 
 .controls { 
     display: flex; 
-    flex-wrap: wrap; /* Allow buttons to wrap if not enough space */
-    gap: 5px; /* Space between buttons */
+    flex-wrap: wrap;
+    gap: 5px; 
     margin-bottom: 10px; 
     padding-bottom: 10px;
     border-bottom: 1px solid #ccc;
 }
 .controls button { 
     padding: 8px 10px; 
-    flex-grow: 1; /* Allow buttons to grow and fill space */
-    min-width: 120px; /* Minimum width for buttons */
+    flex-grow: 1; 
+    min-width: 120px; 
     border: 1px solid #ccc;
     background-color: #f0f0f0;
     cursor: pointer;
@@ -25,11 +25,47 @@ body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column
 
 
 .chat-area { flex-grow: 1; display: flex; flex-direction: column; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px; }
-#chatOutput { flex-grow: 1; overflow-y: auto; margin-bottom: 10px; padding: 5px; border: 1px solid #eee; min-height: 150px;} /* Increased min-height */
-.message { margin-bottom: 8px; padding: 8px 10px; border-radius: 6px; line-height: 1.4; }
-.message.user { background-color: #e1f5fe; text-align: left; margin-left: 0; margin-right: 20%; } /* Adjusted for LTR */
-.message.ai { background-color: #f0f0f0; margin-left: 20%; margin-right: 0; } /* Adjusted for LTR */
-.message .timestamp { font-size: 0.75em; color: #666; display: block; margin-top: 4px; }
+#chatOutput { flex-grow: 1; overflow-y: auto; margin-bottom: 10px; padding: 5px; border: 1px solid #eee; min-height: 150px;}
+.message { margin-bottom: 8px; padding: 8px 10px; border-radius: 6px; line-height: 1.4; position: relative; } /* Added position relative */
+.message.user { background-color: #e1f5fe; text-align: left; margin-left: 0; margin-right: 20%; }
+.message.ai { background-color: #f0f0f0; margin-left: 20%; margin-right: 0; }
+
+.message-content-wrapper { /* New wrapper for actual content */
+    padding-bottom: 5px; /* Space for footer */
+}
+
+.message-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75em;
+    color: #666;
+    margin-top: 4px;
+}
+
+.timestamp { 
+    /* font-size: 0.75em; color: #666; display: block; margin-top: 4px; */ 
+    /* No longer block, part of footer */
+}
+
+.archive-action {
+    margin-left: 10px;
+    cursor: pointer;
+    font-size: 0.9em; /* Smaller than timestamp for balance */
+}
+.archive-icon {
+    color: #007bff;
+}
+.archive-icon:hover {
+    color: #0056b3;
+}
+.archived-text {
+    color: #5cb85c; /* Green for archived */
+    font-style: italic;
+    cursor: default;
+}
+
+
 #selectedTextPreview { font-size: 0.9em; background-color: #f9f9f9; }
 #chatInput { width: calc(100% - 12px); min-height: 70px; margin-bottom: 5px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
 #sendMessageButton { padding: 10px 15px; width: 100%; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
@@ -39,16 +75,11 @@ body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column
     border-top: 1px solid #ccc; 
     padding-top: 10px; 
     margin-top: 10px; 
-    max-height: 35%;  /* Adjust as needed */
+    max-height: 35%; 
     overflow-y: auto; 
-    display: block !important; /* Ensure it's visible */
+    display: block !important;
 }
-.history-panel h3 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    font-size: 1em;
-    font-weight: bold;
-}
+.history-panel h3 { margin-top: 0; margin-bottom: 10px; font-size: 1em; font-weight: bold; }
 .history-item { 
     padding: 8px 10px; 
     border-bottom: 1px solid #eee; 
@@ -75,15 +106,8 @@ body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column
     background-color: #fff;
     border-radius: 3px;
 }
-.history-item-buttons button.archive-btn:hover {
-    background-color: #e6f7ff; /* Light blue */
-    border-color: #91d5ff;
-}
-.history-item-buttons button.delete-btn:hover {
-    background-color: #ffebe6; /* Light red */
-    border-color: #ffccc7;
-}
-
+.history-item-buttons button.archive-btn:hover { background-color: #e6f7ff; border-color: #91d5ff; }
+.history-item-buttons button.delete-btn:hover { background-color: #ffebe6; border-color: #ffccc7; }
 
 #clearAllHistoryButton {
     display: block;
@@ -95,11 +119,5 @@ body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column
     border: none;
     border-radius: 4px;
 }
-#clearAllHistoryButton:hover {
-    background-color: #d9363e;
-}
-
-.temporary-status {
-    font-style: italic;
-    color: #777;
-}
+#clearAllHistoryButton:hover { background-color: #d9363e; }
+.temporary-status { font-style: italic; color: #777; }

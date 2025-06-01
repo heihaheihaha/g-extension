@@ -33,7 +33,7 @@ h1 {
 .archived-chat-title {
     cursor: pointer;
     margin-top: 0;
-    margin-bottom: 10px;
+    margin-bottom: 5px; /* Adjusted */
     font-size: 1.2em;
     color: #007bff;
 }
@@ -41,9 +41,17 @@ h1 {
     text-decoration: underline;
 }
 
+.archive-date { /* New style */
+    display: block;
+    font-size: 0.8em;
+    color: #777;
+    margin-bottom: 10px;
+}
+
 .archived-chat-content {
     padding-left: 10px;
     border-left: 3px solid #007bff;
+    margin-top: 10px;
 }
 
 .message {
@@ -63,14 +71,13 @@ h1 {
 
 .message strong {
     font-weight: bold;
+    display: block; /* Ensure role and time are on one line, text below */
+    margin-bottom: 3px;
+}
+.msg-text-content { /* New class to wrap message text */
+    /* No specific styles needed unless you want to indent or similar */
 }
 
-.timestamp {
-    display: block;
-    font-size: 0.8em;
-    color: #777;
-    margin-top: 5px;
-}
 
 .delete-archive-btn, #clearAllArchivedButton {
     background-color: #ff4d4f;
