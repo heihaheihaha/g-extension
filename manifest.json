@@ -40,6 +40,11 @@
         "archive.html",
         "archive.js",
         "archive.css",
+        "options.html",
+        "options.js",
+        "prompts.html",
+        "prompts.js",
+        "prompts.css",
         "libs/*",
         "images/*"
       ],

@@ -6,12 +6,16 @@ let currentChat = [];
 let allChats = [];
 let archivedChats = [];
 let currentSelectedText = null;
+let promptTemplates = []; // New: For storing prompt templates
 
 // --- DOM 元素获取 ---
 let chatOutput, chatInput, sendMessageButton, summarizePageButton,
     selectedTextPreview, selectedTextContent, clearSelectedTextButton,
     historyPanel, chatHistoryList, clearAllHistoryButton,
-    splitChatButton, /*saveCurrentChatButton, REMOVED */ viewArchivedChatsButton;
+    splitChatButton, viewArchivedChatsButton,
+    managePromptsButton, // New
+    promptShortcutsContainer; // New
+
 
 // --- 初始化和API Key加载 ---
 async function initialize() {
@@ -26,8 +30,10 @@ async function initialize() {
     chatHistoryList = document.getElementById('chatHistoryList');
     clearAllHistoryButton = document.getElementById('clearAllHistoryButton');
     splitChatButton = document.getElementById('splitChatButton');
-    // saveCurrentChatButton = document.getElementById('saveCurrentChatButton'); // REMOVED
     viewArchivedChatsButton = document.getElementById('viewArchivedChatsButton');
+    managePromptsButton = document.getElementById('managePromptsButton'); // New
+    promptShortcutsContainer = document.getElementById('promptShortcuts'); // New
+
 
     if (typeof marked !== 'object' || marked === null || typeof marked.parse !== 'function') {
         console.warn("Marked Library Test - marked is not an object or marked.parse is not a function.");
@@ -47,10 +53,11 @@ async function initialize() {
         disableInputs();
     }
 
-    await loadArchivedChats(); // Load archives first to get count for button
-    loadChatHistory(); // Loads allChats and potentially currentChat
+    await loadArchivedChats(); 
+    loadChatHistory(); 
+    await loadPromptTemplates(); // New: Load prompts
 
-    if (!currentChat || currentChat.length === 0 && allChats.length === 0) { // If no history to load into currentChat
+    if (!currentChat || currentChat.length === 0 && allChats.length === 0) {
         renderCurrentChat();
     }
 
@@ -81,14 +88,20 @@ async function initialize() {
     }
 
     if (splitChatButton) splitChatButton.addEventListener('click', handleSplitChat);
-    // Event listener for saveCurrentChatButton removed
     if (viewArchivedChatsButton) {
         viewArchivedChatsButton.addEventListener('click', () => {
             chrome.tabs.create({ url: chrome.runtime.getURL('archive.html') });
         });
     }
+    // New: Event listener for Manage Prompts button
+    if (managePromptsButton) {
+        managePromptsButton.addEventListener('click', () => {
+            chrome.tabs.create({ url: chrome.runtime.getURL('prompts.html') });
+        });
+    }
 
-    chrome.storage.onChanged.addListener((changes, namespace) => {
+
+    chrome.storage.onChanged.addListener(async (changes, namespace) => { // Added async here
         if (namespace === 'sync' && changes.geminiApiKey) {
             geminiApiKey = changes.geminiApiKey.newValue;
             addMessageToChat({ role: 'model', parts: [{text: 'API 密钥已更新。'}], timestamp: Date.now() });
@@ -103,10 +116,69 @@ async function initialize() {
                 archivedChats = changes.geminiArchivedChats.newValue || [];
                 updateArchivedChatsButtonCount();
             }
+            // New: Listen for prompt template changes
+            if (changes.promptTemplates) {
+                await loadPromptTemplates();
+            }
         }
     });
     chrome.runtime.onMessage.addListener(handleRuntimeMessages);
 }
+
+// New: Function to load prompt templates
+async function loadPromptTemplates() {
+    const result = await chrome.storage.local.get(['promptTemplates']);
+    const presets = [
+        { id: 'preset-translate', name: '翻译', content: '请将以下文本翻译成[目标语言]：\n\n{{text}}', isPreset: true },
+        { id: 'preset-summarize', name: '总结', content: '请总结以下文本的主要内容：\n\n{{text}}', isPreset: true }
+    ];
+
+    if (result.promptTemplates && result.promptTemplates.length > 0) {
+        promptTemplates = result.promptTemplates;
+        // Ensure presets are always up-to-date or added if missing
+        presets.forEach(preset => {
+            const existing = promptTemplates.find(p => p.id === preset.id);
+            if (!existing) {
+                promptTemplates.unshift(preset);
+            } else if (existing.isPreset) { // Update existing preset's content/name if needed
+                existing.name = preset.name;
+                existing.content = preset.content;
+            }
+        });
+    } else {
+        promptTemplates = [...presets];
+        await chrome.storage.local.set({ promptTemplates: promptTemplates }); // Save presets if first time
+    }
+    renderPromptShortcuts();
+}
+
+// New: Function to render prompt shortcut buttons
+function renderPromptShortcuts() {
+    if (!promptShortcutsContainer) return;
+    promptShortcutsContainer.innerHTML = ''; // Clear existing shortcuts
+
+    promptTemplates.forEach(template => {
+        const button = document.createElement('button');
+        button.classList.add('prompt-shortcut-button');
+        button.textContent = template.name;
+        button.title = template.content.substring(0, 100) + (template.content.length > 100 ? '...' : '');
+        button.addEventListener('click', () => applyPromptTemplate(template));
+        promptShortcutsContainer.appendChild(button);
+    });
+}
+
+// New: Function to apply a prompt template
+function applyPromptTemplate(template) {
+    let content = template.content;
+    if (currentSelectedText) {
+        content = content.replace(/{{text}}/g, currentSelectedText);
+    }
+    chatInput.value = content;
+    chatInput.focus();
+    // Optionally, auto-send if {{text}} was the only thing and it got replaced?
+    // For now, just populate and let user send.
+}
+
 
 function updateArchivedChatsButtonCount() {
     if (viewArchivedChatsButton) {
@@ -118,11 +190,9 @@ function handleSplitChat() {
     const chatToProcess = currentChat.filter(msg => !(msg.isThinking || msg.isTempStatus));
     
     if (chatToProcess.length > 0) {
-        // 1. Archive the entire current chat session
-        archivedChats.unshift([...chatToProcess].map(m => ({...m, archived: undefined }))); // Add a clean copy to archives
+        archivedChats.unshift([...chatToProcess].map(m => ({...m, archived: undefined }))); 
         saveArchivedChats();
 
-        // 2. Save to regular history (allChats)
         let alreadyInAllChats = false;
         if (allChats.length > 0 && JSON.stringify(allChats[0]) === JSON.stringify(chatToProcess)) {
             alreadyInAllChats = true;
@@ -130,7 +200,7 @@ function handleSplitChat() {
         if (!alreadyInAllChats) {
             allChats.unshift([...chatToProcess]);
             if (allChats.length > 50) allChats.pop();
-            saveChatHistory(); // This saves allChats
+            saveChatHistory(); 
             renderChatHistoryList();
         }
     }
@@ -138,17 +208,14 @@ function handleSplitChat() {
     currentChat = [];
     renderCurrentChat();
     addMessageToChat({ role: 'model', parts: [{text: '对话已分割并存档。新的对话已开始。'}], timestamp: Date.now() });
-    // saveCurrentChat called by addMessageToChat will handle the new empty currentChat
 }
 
-// handleSaveCurrentChat function REMOVED
 
 function archiveQaPair(aiMessageIndexInCurrentChat) {
     const aiMessage = currentChat[aiMessageIndexInCurrentChat];
-    if (!aiMessage || aiMessage.archived) return; // Already archived or invalid
+    if (!aiMessage || aiMessage.archived) return; 
 
     let userMessage = null;
-    // Find the immediately preceding user message in currentChat
     for (let i = aiMessageIndexInCurrentChat - 1; i >= 0; i--) {
         if (currentChat[i].role === 'user' && !currentChat[i].isThinking && !currentChat[i].isTempStatus) {
             userMessage = currentChat[i];
@@ -157,10 +224,9 @@ function archiveQaPair(aiMessageIndexInCurrentChat) {
     }
 
     if (userMessage && aiMessage) {
-        // Create a deep copy for the archive, without the 'archived' flag in the copy
         const userMessageCopy = JSON.parse(JSON.stringify(userMessage));
         const aiMessageCopy = JSON.parse(JSON.stringify(aiMessage));
-        delete userMessageCopy.archived; // Ensure clean copy for archive
+        delete userMessageCopy.archived; 
         delete aiMessageCopy.archived;
 
         const qaPairToArchive = [userMessageCopy, aiMessageCopy];
@@ -168,11 +234,10 @@ function archiveQaPair(aiMessageIndexInCurrentChat) {
         archivedChats.unshift(qaPairToArchive);
         saveArchivedChats();
 
-        // Mark the original AI message in currentChat as archived
         aiMessage.archived = true; 
         
-        renderCurrentChat(); // Re-render to show "已存档"
-        saveCurrentChat(); // Persist the 'archived' flag in currentChat and thus in allChats
+        renderCurrentChat(); 
+        saveCurrentChat(); 
 
         const tempStatusMsg = addMessageToChat({role: 'model', parts: [{text: '该问答已存档。'}], timestamp: Date.now(), isTempStatus: true});
         setTimeout(() => {
@@ -253,8 +318,9 @@ function removeMessageByContentCheck(conditionFn) {
 
 async function handleSendMessage() {
     const messageText = chatInput.value.trim();
-    if (!messageText && !currentSelectedText) {
-        addMessageToChat({ role: 'model', parts: [{text: '请输入消息或选择页面文本后再发送。'}], timestamp: Date.now() });
+    if (!messageText && !currentSelectedText) { // Modified condition slightly, though `messageText` alone was main check
+        addMessageToChat({ role: 'model', parts: [{text: '请输入消息或选择页面文本后再发送。'}], timestamp: Date.now(), isTempStatus: true });
+        setTimeout(() => removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.startsWith('请输入消息')), 3000);
         return;
     }
     if (!geminiApiKey) {
@@ -264,16 +330,51 @@ async function handleSendMessage() {
     }
 
     let userMessageContent = messageText;
-    let displayMessage = messageText;
+    // Display message logic for chat history if selected text was part of input (via template or manual)
+    // For now, the display message will be what's in the chatInput.
+    // If a template was used and {{text}} was replaced, that's already in messageText.
+    // If user manually typed after using a template that still has {{text}}, it will be sent as is.
 
-    if (currentSelectedText) {
+    // If `currentSelectedText` exists AND `messageText` (from chatInput) explicitly contains `{{text}}`,
+    // it implies the user might be using a template and wants the selected text injected there.
+    // However, the `applyPromptTemplate` already handles this if a shortcut was clicked.
+    // This direct send primarily handles manually typed messages or messages where template was manually edited.
+    
+    let displayMessage = messageText; // This will be what's shown in the chat.
+
+    if (currentSelectedText && messageText.includes("{{text}}")) {
+         // If user manually typed or edited a template that still has {{text}}
+         // and there IS selected text, replace it for the API call.
+        userMessageContent = messageText.replace(/{{text}}/g, currentSelectedText);
+        // For display, we could show a note or just the processed text.
+        // Let's keep displayMessage as what the user typed, and userMessageContent for API.
+        // OR, be consistent with template application:
+        // displayMessage = userMessageContent; // This would show the replaced text in the chat log for the user.
+                                            // Let's choose this for consistency: what's sent to API is what user sees as their message.
+    } else if (currentSelectedText && !messageText.includes("{{text}}") && messageText) {
+        // If there's selected text, and user typed something *without* {{text}}
+        // assume they want to ask about the selected text.
+        // This is the original behavior for selected text.
         userMessageContent = `关于以下引用内容：\n"${currentSelectedText}"\n\n我的问题/指令是：\n"${messageText}"`;
         displayMessage = `(引用内容: ${currentSelectedText.substring(0,50)}...) ${messageText}`;
+    } else {
+        // No selected text, or selected text but user didn't use {{text}} and didn't type a separate question
+        // (e.g. chatInput was populated by a template that didn't need currentSelectedText or it was cleared).
+        userMessageContent = messageText;
+        displayMessage = messageText;
     }
+
+
+    if (!userMessageContent.trim()) { // After potential {{text}} replacement, if it's empty
+        addMessageToChat({ role: 'model', parts: [{text: '请输入有效消息。'}], timestamp: Date.now(), isTempStatus: true });
+        setTimeout(() => removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.startsWith('请输入有效消息')), 3000);
+        return;
+    }
+
     addMessageToChat({ role: 'user', parts: [{text: displayMessage}], timestamp: Date.now() });
 
     chatInput.value = '';
-    clearSelectedTextPreview();
+    clearSelectedTextPreview(); // Clear selected text quote after sending
 
     await callGeminiAPI([{ text: userMessageContent }]);
 }
@@ -321,7 +422,7 @@ function disableInputs() {
     if (sendMessageButton) sendMessageButton.disabled = true;
     if (summarizePageButton) summarizePageButton.disabled = true;
     if (splitChatButton) splitChatButton.disabled = true;
-    // if (saveCurrentChatButton) saveCurrentChatButton.disabled = true; // REMOVED
+    if (managePromptsButton) managePromptsButton.disabled = true; // Disable if API key missing
 }
 
 function enableInputs() {
@@ -329,7 +430,7 @@ function enableInputs() {
     if (sendMessageButton) sendMessageButton.disabled = false;
     if (summarizePageButton) summarizePageButton.disabled = false;
     if (splitChatButton) splitChatButton.disabled = false;
-    // if (saveCurrentChatButton) saveCurrentChatButton.disabled = false; // REMOVED
+    if (managePromptsButton) managePromptsButton.disabled = false;
 }
 
 async function callGeminiAPI(parts, isSummary = false) {
@@ -342,8 +443,6 @@ async function callGeminiAPI(parts, isSummary = false) {
 
     const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`;
     
-    // Prepare history for API: all messages in currentChat *before* the latest user message (which is in `parts`)
-    // and also before the "Thinking..." message.
     const historyForAPI = currentChat
         .filter(msg => msg.timestamp < thinkingMessage.timestamp && !msg.isTempStatus && !msg.isThinking)
         .map(msg => ({
@@ -351,7 +450,6 @@ async function callGeminiAPI(parts, isSummary = false) {
             parts: msg.parts.map(part => ({ text: part.text }))
         }));
     
-    // The `parts` argument to this function is the current user's turn.
     const requestContents = [...historyForAPI, { role: "user", parts: parts }];
 
     const requestBody = {
@@ -393,28 +491,24 @@ async function callGeminiAPI(parts, isSummary = false) {
 
 function addMessageToChat(message) {
     if (!message.parts || !Array.isArray(message.parts) || message.parts.length === 0 || typeof message.parts[0].text !== 'string') {
+        // Fallback for older message formats or simple text messages
         message.parts = [{ text: message.text || "无效消息格式" }];
     }
     
-    // Avoid duplicate temporary status messages for link summarization
     if (message.isTempStatus && message.parts[0].text.includes("正在总结链接")) {
         const existingTempLinkSummaryMsg = currentChat.find(msg => msg.isTempStatus && msg.parts[0].text.includes("正在总结链接"));
         if (existingTempLinkSummaryMsg) {
-            // If a new one comes, remove old, add new, or update. For now, just don't add if one exists.
-            // This might need refinement if multiple links are summarized quickly.
-            // A better approach would be to give temp messages unique IDs if they need to be individually managed.
-            // For now, let's just prevent exact duplicates of "正在总结链接..."
-            if (currentChat.some(m => m.isTempStatus && m.parts[0].text === message.parts[0].text)) return message; // Do not add if exact same temp msg exists
+            if (currentChat.some(m => m.isTempStatus && m.parts[0].text === message.parts[0].text)) return message; 
         }
     }
     
     const messageWithTimestamp = { ...message, timestamp: message.timestamp || Date.now()};
     currentChat.push(messageWithTimestamp);
     renderCurrentChat();
-    if (!message.isTempStatus && !message.isThinking) { // Don't save purely temporary or thinking states to history permanently via this path
+    if (!message.isTempStatus && !message.isThinking) {
       saveCurrentChat();
     }
-    return messageWithTimestamp; // Return the message with timestamp, useful for removal
+    return messageWithTimestamp; 
 }
 
 
@@ -435,7 +529,7 @@ function renderCurrentChat() {
                     console.error("Error parsing markdown:", e);
                     contentHtml = escapeHtml(msg.parts[0].text); 
                 }
-            } else { // For user messages, thinking, or temp status
+            } else { 
                 contentHtml = escapeHtml(msg.parts[0].text).replace(/\n/g, '<br>');
             }
         } else {
@@ -463,7 +557,7 @@ function renderCurrentChat() {
                 archiveElement.textContent = '已存档';
                 archiveElement.classList.add('archived-text');
             } else {
-                archiveElement.innerHTML = '&#x1F4C1;'; // Folder icon
+                archiveElement.innerHTML = '&#x1F4C1;'; 
                 archiveElement.title = '存档此问答';
                 archiveElement.classList.add('archive-icon');
                 archiveElement.onclick = (e) => {
@@ -497,45 +591,42 @@ function clearSelectedTextPreview() {
     if (selectedTextContent) selectedTextContent.textContent = '';
 }
 
-function saveChatHistory() { // Saves allChats to storage
+function saveChatHistory() { 
     const cleanAllChats = allChats.map(chat => 
         chat.filter(msg => !msg.isTempStatus && !msg.isThinking)
     );
     chrome.storage.local.set({ 'geminiChatHistory': cleanAllChats });
 }
 
-function saveCurrentChat() { // Updates allChats[0] or adds new, then calls saveChatHistory
+function saveCurrentChat() { 
     const chatToStore = currentChat.filter(msg => !(msg.isThinking || msg.isTempStatus));
 
     if (chatToStore.length === 0) {
-        // If current chat is empty or only temp messages, don't create a new history entry from it,
-        // but ensure allChats (which might have been modified by other operations like delete) is saved.
         saveChatHistory();
         return;
     }
     
     let foundAndUpdated = false;
     if (allChats.length > 0) {
-        // Try to find if this currentChat session (based on first message's timestamp) already exists
         const existingChatIndex = allChats.findIndex(
             histChat => histChat.length > 0 && chatToStore.length > 0 && histChat[0].timestamp === chatToStore[0].timestamp
         );
 
-        if (existingChatIndex !== -1) { // Found a chat in history that started at the same time
-            allChats[existingChatIndex] = [...chatToStore]; // Update it
+        if (existingChatIndex !== -1) { 
+            allChats[existingChatIndex] = [...chatToStore]; 
             foundAndUpdated = true;
         }
     }
 
-    if (!foundAndUpdated) { // If it's a new session or couldn't find a match
-        allChats.unshift([...chatToStore]); // Add as the newest session
+    if (!foundAndUpdated) { 
+        allChats.unshift([...chatToStore]); 
     }
 
-    if (allChats.length > 50) { // Keep history to a manageable size
+    if (allChats.length > 50) { 
         allChats = allChats.slice(0, 50);
     }
-    saveChatHistory(); // Persist the modified allChats
-    renderChatHistoryList(); // Update the displayed list
+    saveChatHistory(); 
+    renderChatHistoryList(); 
 }
 
 
@@ -548,9 +639,9 @@ async function loadChatHistory() {
                 allChats = [];
             }
 
-            if (allChats.length > 0 && currentChat.length === 0) { // Only load if currentChat is empty
+            if (allChats.length > 0 && currentChat.length === 0) { 
                 currentChat = [...allChats[0]];
-            } else if (currentChat.length === 0) { // Both allChats and currentChat are empty
+            } else if (currentChat.length === 0) { 
                  currentChat = [];
             }
             renderCurrentChat();
@@ -612,7 +703,6 @@ function renderChatHistoryList() {
                 e.stopPropagation();
                 if (confirm(`确定要存档这个完整对话 ("${titleText}") 吗？`)) {
                     const chatToArchiveFromHistory = allChats.splice(index, 1)[0];
-                    // Ensure no 'archived' flags from per-message archives are in this full copy
                     const cleanChatToArchive = chatToArchiveFromHistory.map(m => {
                         const copy = {...m};
                         delete copy.archived;
@@ -653,8 +743,6 @@ function renderChatHistoryList() {
             historyItem.onclick = () => { 
                 currentChat = [...chat];
                 renderCurrentChat();
-                // When loading from history, this becomes the "active" session.
-                // saveCurrentChat will ensure it's at the top of allChats if any interaction happens.
             };
             chatHistoryList.appendChild(historyItem);
         }

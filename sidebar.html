@@ -11,7 +11,14 @@
       <button id="summarizePageButton">总结当前网页 (中文)</button>
       <button id="splitChatButton">分割当前对话</button>
       <button id="viewArchivedChatsButton">查看已存档对话</button>
+      <button id="managePromptsButton">管理 Prompt</button> </div>
+
+    <div class="prompt-shortcuts-container">
+      <h4>Prompt 快捷方式:</h4>
+      <div id="promptShortcuts" class="prompt-shortcuts">
+        </div>
     </div>
+
     <div class="chat-area">
       <div id="chatOutput">
         </div>
@@ -19,7 +26,7 @@
         引用内容: <span id="selectedTextContent"></span>
         <button id="clearSelectedTextButton" style="margin-left: 5px; font-size: 0.8em;">清除</button>
       </div>
-      <textarea id="chatInput" placeholder="输入消息或等待选择文本..."></textarea>
+      <textarea id="chatInput" placeholder="输入消息或使用快捷方式..."></textarea>
       <button id="sendMessageButton">发送</button>
     </div>
     <div class="history-panel">

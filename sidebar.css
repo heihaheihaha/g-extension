@@ -409,3 +409,39 @@ body {
 .message-content-wrapper a:hover {
     text-decoration: underline;
 }
+
+.prompt-shortcuts-container {
+  padding: 8px 0px; /* Match controls padding */
+  /* border-bottom: 1px solid var(--border-color); */ /* Optional: if you want a separator */
+  margin-bottom: 10px;
+}
+
+.prompt-shortcuts-container h4 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 0.95em;
+  color: var(--secondary-text-color);
+  font-weight: 500;
+}
+
+.prompt-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prompt-shortcut-button {
+  padding: 6px 10px;
+  background-color: #e9ecef; /* Light grey, less prominent than main controls */
+  color: var(--primary-text-color);
+  border: 1px solid #ced4da;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+}
+
+.prompt-shortcut-button:hover {
+  background-color: #d1d9e0;
+  border-color: #adb5bd;
+}
