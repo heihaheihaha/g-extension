@@ -79,6 +79,44 @@ body {
   background-color: var(--control-button-hover-bg);
 }
 
+/* MODIFIED STYLES FOR PROMPT SHORTCUTS - START */
+.prompt-shortcuts-container {
+  padding: 4px 0px; /* Reduced from 8px 0px */
+  margin-bottom: 6px; /* Reduced from 10px */
+  /* border-bottom: 1px solid var(--border-color); */ /* Optional separator */
+}
+
+.prompt-shortcuts-container h4 {
+  margin-top: 0;
+  margin-bottom: 4px; /* Reduced from 8px */
+  font-size: 0.9em; /* Slightly smaller */
+  color: var(--secondary-text-color);
+  font-weight: 500;
+}
+
+.prompt-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px; /* Reduced from 8px */
+}
+
+.prompt-shortcut-button {
+  padding: 4px 8px; /* Reduced from 6px 10px */
+  background-color: #e9ecef;
+  color: var(--primary-text-color);
+  border: 1px solid #ced4da;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+}
+
+.prompt-shortcut-button:hover {
+  background-color: #d1d9e0;
+  border-color: #adb5bd;
+}
+/* MODIFIED STYLES FOR PROMPT SHORTCUTS - END */
+
 .chat-area {
   flex-grow: 1;
   display: flex;
@@ -110,18 +148,16 @@ body {
 .message.user {
   background-color: var(--user-message-bg);
   color: var(--user-message-text);
-  margin-right: 20%; /* Indent user messages from the right */
+  margin-right: 20%; 
 }
 
 .message.ai {
   background-color: var(--ai-message-bg);
   color: var(--ai-message-text);
-  /* margin-left: 20%; Removed for full width */
-  /* align-self: flex-end; Removed as not applicable in this context */
 }
 
 .message-content-wrapper {
-  padding-bottom: 5px; /* Space for footer */
+  padding-bottom: 5px; 
 }
 .message-content-wrapper p:last-child {
   margin-bottom: 0;
@@ -171,7 +207,7 @@ body {
 
 .archive-icon {
   color: var(--primary-button-bg);
-  font-family: 'Courier New', Courier, monospace; /* For a simple folder icon */
+  font-family: 'Courier New', Courier, monospace; 
   font-weight: bold;
 }
 .archive-icon:hover {
@@ -179,19 +215,19 @@ body {
 }
 
 .archived-text {
-  color: #28a745; /* Green for archived */
+  color: #28a745; 
   font-style: italic;
   cursor: default;
 }
 
 #selectedTextPreview {
   font-size: 0.9em;
-  background-color: #fff3cd; /* Light yellow for emphasis */
+  background-color: #fff3cd; 
   color: #856404;
   padding: 8px 12px;
   border: 1px solid #ffeeba;
   border-radius: var(--border-radius);
-  display: flex; /* For aligning text and clear button */
+  display: flex; 
   justify-content: space-between;
   align-items: center;
 }
@@ -206,7 +242,7 @@ body {
   background: none;
   border: none;
   color: #856404;
-  font-size: 1em; /* Relative to parent */
+  font-size: 1em; 
   padding: 2px 5px;
   cursor: pointer;
   border-radius: 3px;
@@ -216,16 +252,16 @@ body {
 }
 
 #chatInput {
-  width: 100%; /* Takes full width of its container */
+  width: 100%; 
   min-height: 70px;
   padding: 10px;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  box-sizing: border-box; /* Include padding and border in element's total width and height */
+  box-sizing: border-box; 
   font-family: inherit;
   font-size: 1em;
   line-height: 1.5;
-  resize: vertical; /* Allow vertical resizing */
+  resize: vertical; 
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 #chatInput:focus {
@@ -257,8 +293,7 @@ body {
 .history-panel {
   border-top: 1px solid var(--border-color);
   padding-top: 12px;
-  /* max-height can be adjusted based on preference, or use flex basis */
-  max-height: 30%; /* Example: Limit history panel height */
+  max-height: 30%; 
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -266,7 +301,7 @@ body {
   background-color: #ffffff;
   padding: 10px;
   border-radius: var(--border-radius);
-  box-shadow: 0 -1px 5px rgba(0,0,0,0.03); /* Subtle shadow at the top */
+  box-shadow: 0 -1px 5px rgba(0,0,0,0.03); 
 }
 
 .history-panel h3 {
@@ -278,8 +313,8 @@ body {
 }
 
 #chatHistoryList {
-  overflow-y: auto; /* Allow scroll within the list if it gets too long */
-  flex-grow: 1; /* Takes available space before clear button */
+  overflow-y: auto; 
+  flex-grow: 1; 
 }
 
 .history-item {
@@ -290,7 +325,7 @@ body {
   justify-content: space-between;
   align-items: center;
   transition: background-color 0.15s ease-in-out;
-  border-radius: 4px; /* Slight radius for items */
+  border-radius: 4px; 
 }
 .history-item:last-child {
   border-bottom: none;
@@ -338,8 +373,8 @@ body {
 
 #clearAllHistoryButton {
   display: block;
-  width: 100%; /* Full width of its container */
-  margin-top: 8px; /* Space from history list */
+  width: 100%; 
+  margin-top: 8px; 
   padding: 9px 12px;
   background-color: var(--destructive-button-bg);
   color: var(--destructive-button-text);
@@ -356,7 +391,7 @@ body {
 .temporary-status {
   font-style: italic;
   color: var(--light-text-color);
-  background-color: var(--sidebar-bg-color); /* Match sidebar background */
+  background-color: var(--sidebar-bg-color); 
   padding: 8px 10px;
   text-align: center;
   border: 1px dashed var(--border-color);
@@ -372,7 +407,7 @@ body {
 #chatOutput::-webkit-scrollbar-track,
 .history-panel::-webkit-scrollbar-track,
 #chatHistoryList::-webkit-scrollbar-track {
-  background: transparent; /* Or var(--sidebar-bg-color) */
+  background: transparent; 
 }
 
 #chatOutput::-webkit-scrollbar-thumb,
@@ -380,7 +415,7 @@ body {
 #chatHistoryList::-webkit-scrollbar-thumb {
   background-color: var(--border-color);
   border-radius: 10px;
-  border: 2px solid transparent; /* Creates padding around thumb */
+  border: 2px solid transparent; 
   background-clip: content-box;
 }
 
@@ -408,40 +443,4 @@ body {
 }
 .message-content-wrapper a:hover {
     text-decoration: underline;
-}
-
-.prompt-shortcuts-container {
-  padding: 8px 0px; /* Match controls padding */
-  /* border-bottom: 1px solid var(--border-color); */ /* Optional: if you want a separator */
-  margin-bottom: 10px;
-}
-
-.prompt-shortcuts-container h4 {
-  margin-top: 0;
-  margin-bottom: 8px;
-  font-size: 0.95em;
-  color: var(--secondary-text-color);
-  font-weight: 500;
-}
-
-.prompt-shortcuts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.prompt-shortcut-button {
-  padding: 6px 10px;
-  background-color: #e9ecef; /* Light grey, less prominent than main controls */
-  color: var(--primary-text-color);
-  border: 1px solid #ced4da;
-  border-radius: var(--border-radius);
-  cursor: pointer;
-  font-size: 0.85em;
-  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
-}
-
-.prompt-shortcut-button:hover {
-  background-color: #d1d9e0;
-  border-color: #adb5bd;
 }
