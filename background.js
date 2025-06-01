@@ -6,79 +6,130 @@ async function loadApiKey() {
     const result = await chrome.storage.sync.get(['geminiApiKey']);
     if (result.geminiApiKey) {
       geminiApiKey = result.geminiApiKey;
-      console.log("Background: Gemini API Key loaded.");
+      // console.log("Background: Gemini API Key loaded.");
     } else {
       console.warn("Background: Gemini API Key not found in storage.");
-      // Optionally, you could open the options page here if the key is missing
-      // chrome.runtime.openOptionsPage();
     }
   } catch (e) {
     console.error("Background: Error loading API Key:", e);
   }
 }
 
-// Initialize API key and side panel behavior when the extension starts
 (async () => {
   await loadApiKey();
   try {
-    // This makes the extension icon click open the side panel.
-    // Requires Chrome 114+
     await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-  } catch (error) {
+  } catch (error)
+ {
     console.error("Background: Failed to set side panel behavior:", error);
-    // Fallback for older versions or if specific click handling is needed:
-    // chrome.action.onClicked.addListener(async (tab) => {
-    //   if (tab.id) {
-    //     await chrome.sidePanel.open({ tabId: tab.id });
-    //   }
-    // });
   }
 })();
 
-// Listen for API Key changes from options page
 chrome.storage.onChanged.addListener((changes, namespace) => {
   if (namespace === 'sync' && changes.geminiApiKey) {
     geminiApiKey = changes.geminiApiKey.newValue;
-    console.log("Background: Gemini API Key updated.");
+    // console.log("Background: Gemini API Key updated.");
   }
 });
 
-// REMOVE the old chrome.action.onClicked listener that sent 'toggleSidebar'
-// chrome.action.onClicked.addListener((tab) => { ... }); // REMOVE THIS
-
-// Listen for messages from content_script.js or sidebar.js (now side panel)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "getAndSummarizePage") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || tabs.length === 0 || !tabs[0].id) {
-        console.error("Background (getAndSummarizePage): No active tab found or tab ID missing.");
         sendResponse({ error: "无法确定活动标签页。" });
         return;
       }
       const activeTabId = tabs[0].id;
       chrome.tabs.sendMessage(activeTabId, { action: "getPageContentForSummarize" }, (pageResponse) => {
         if (chrome.runtime.lastError) {
-          console.error("Background (getAndSummarizePage): Error messaging content script:", chrome.runtime.lastError.message);
           sendResponse({ error: "获取页面内容失败 (CS通讯错误): " + chrome.runtime.lastError.message });
           return;
         }
         if (pageResponse && typeof pageResponse.contentForSummary === 'string') {
           sendResponse({ contentForSummary: pageResponse.contentForSummary });
         } else {
-          console.warn("Background (getAndSummarizePage): Invalid response from content script:", pageResponse);
           sendResponse({ error: "未能从页面获取内容 (CS数据无效或格式错误)。" });
         }
       });
     });
     return true;
   } else if (request.action === "TEXT_SELECTED_FROM_PAGE") {
-    // Forward the selected text to the side panel
-    // The side panel's sidebar.js will have a listener for this.
     chrome.runtime.sendMessage({ type: "TEXT_SELECTED_FOR_SIDEBAR", text: request.text });
     sendResponse({ status: "Text selected event forwarded to sidebar" });
-    return true; // Indicate async response if needed, though not strictly for this forward
+    return true;
+  } else if (request.action === "summarizeLinkTarget") {
+    const linkUrl = request.url;
+    const linkText = request.linkText || linkUrl; // Use link text if provided
+    console.log("Background: Received summarizeLinkTarget for:", linkUrl, "Link Text:", linkText);
+    sendResponse({ status: "Processing link summarization..." });
+
+    chrome.runtime.sendMessage({ type: "LINK_SUMMARIZATION_STARTED", url: linkUrl, title: linkText });
+
+    chrome.tabs.create({ url: linkUrl, active: false }, (newTab) => {
+      if (chrome.runtime.lastError || !newTab || !newTab.id) {
+        console.error("Background: Error creating new tab:", chrome.runtime.lastError?.message);
+        chrome.runtime.sendMessage({ type: "SHOW_LINK_SUMMARY_ERROR", message: "无法打开链接: " + (chrome.runtime.lastError?.message || "Unknown error"), url: linkUrl, title: linkText });
+        return;
+      }
+      const tempTabId = newTab.id;
+
+      function tabUpdateListener(tabId, changeInfo, tab) {
+        if (tabId === tempTabId && changeInfo.status === 'complete') {
+          chrome.tabs.onUpdated.removeListener(tabUpdateListener);
+          // console.log("Background: Temporary tab loaded:", linkUrl);
+          chrome.scripting.executeScript({
+            target: { tabId: tempTabId },
+            files: ["libs/Readability.js", "link_content_extractor.js"]
+          }, (injectionResults) => {
+            if (chrome.runtime.lastError) {
+              console.error("Background: Error injecting scripts:", chrome.runtime.lastError.message);
+              chrome.runtime.sendMessage({ type: "SHOW_LINK_SUMMARY_ERROR", message: "无法提取内容 (注入失败): " + chrome.runtime.lastError.message, url: linkUrl, title: linkText });
+              chrome.tabs.remove(tempTabId).catch(e => console.warn("BG: Failed to remove temp tab post-injection-error", e));
+            }
+            // link_content_extractor.js will send "extractedLinkContent"
+          });
+        }
+      }
+      chrome.tabs.onUpdated.addListener(tabUpdateListener);
+      // Timeout for tab loading, in case 'complete' never fires for some pages
+      setTimeout(() => {
+          chrome.tabs.get(tempTabId, (tabDetails) => {
+              if (tabDetails && !tabDetails.status.includes('complete')) { // If tab still exists and isn't complete
+                  chrome.tabs.onUpdated.removeListener(tabUpdateListener);
+                  console.warn(`Background: Timeout waiting for tab ${tempTabId} to load complete for ${linkUrl}. Attempting injection anyway or closing.`);
+                  // Option 1: Try to inject anyway (might fail if DOM not ready)
+                  // Option 2: Send error and close
+                  chrome.runtime.sendMessage({ type: "SHOW_LINK_SUMMARY_ERROR", message: "页面加载超时，无法提取内容。", url: linkUrl, title: linkText });
+                  chrome.tabs.remove(tempTabId).catch(e => console.warn("BG: Failed to remove temp tab post-timeout", e));
+              }
+          });
+      }, 20000); // 20 seconds timeout
+
+    });
+    return true;
+  } else if (request.action === "extractedLinkContent") {
+    const { content, title: extractedTitle, url: originalUrlFromExtractor, error, warning } = request;
+    const tempTabId = sender.tab?.id;
+
+    if (tempTabId) {
+      chrome.tabs.remove(tempTabId).catch(e => console.warn("BG: Failed to remove temp tab", e));
+    }
+
+    if (error) {
+      chrome.runtime.sendMessage({ type: "SHOW_LINK_SUMMARY_ERROR", message: error, url: originalUrlFromExtractor, title: extractedTitle });
+    } else {
+      chrome.runtime.sendMessage({
+        type: "SUMMARIZE_EXTERNAL_TEXT_FOR_SIDEBAR",
+        text: content,
+        linkUrl: originalUrlFromExtractor,
+        linkTitle: extractedTitle, // Use title from Readability
+        warning: warning
+      });
+    }
+    sendResponse({status: "Link content processed."});
+    return true;
   }
-  // Handle other actions if needed
+
   return false;
 });
 
