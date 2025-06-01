@@ -1,206 +1,137 @@
-# 智能侧边栏助手 (Gemini)
+# 智能侧边栏助手 (Gemini) - Intelligent Sidebar Assistant (Gemini)
+## 描述
+
+本 Chrome 扩展程序提供了一个由 Gemini API 驱动的智能侧边栏助手。它允许用户总结网页、进行智能对话以及管理自定义提示，并主要侧重于中文语言支持。
+
+## 功能特性
+
+* **网页总结：** 快速总结当前网页的内容。
+* **智能聊天：** 直接在侧边栏中与 Gemini 模型进行对话。
+* **Prompt 管理：** 为常用任务创建、编辑和管理自定义 Prompt 模板。包含用于翻译和总结的预设 Prompt。
+* **聊天记录：** 保存您与助手的对话。
+* **聊天存档：** 将重要的对话或问答对存档以供日后查看。
+* **右键菜单集成：**
+    * 通过右键单击图片，使用 Gemini 分析图片。
+    * 通过将链接拖放到预览窗口或通过右键菜单（基于 `content_script.js` 的功能）总结链接目标。
+* **文本选择集成：** 轻松地在您的 Prompt 中使用从网页选择的文本。
+* **图片支持：** 在与 AI 的对话中包含图片。
+* **API 密钥配置：** 用户可以在扩展程序的选项中安全地保存其 Gemini API 密钥。
+* **侧边栏用户界面：** 浏览器侧边栏中现代化且用户友好的界面。
+* **专注中文：** 用户界面和默认 Prompt 均为中文，专为中文用户设计。
+
+## 安装步骤
+
+1.  **下载扩展文件：** 确保您已将所有扩展文件放置在单个文件夹中（例如 `g-extension`）。
+2.  **打开 Chrome 扩展程序页面：**
+    * 打开 Google Chrome 浏览器。
+    * 导航到 `chrome://extensions/`。
+3.  **启用开发者模式：**
+    * 在扩展程序页面的右上角，打开“开发者模式”开关。
+4.  **加载已解压的扩展程序：**
+    * 点击出现的“加载已解压的扩展程序”按钮。
+    * 选择包含扩展文件的文件夹（例如 `g-extension`）。
+5.  扩展程序图标现在应该会出现在您的 Chrome 工具栏中。
+
+## 使用方法
+
+1.  **设置 API 密钥：**
+    * 在 Chrome 工具栏中右键单击扩展程序图标，然后选择“选项”，或导航到扩展程序的选项页面。
+    * 输入您的 Gemini API 密钥，然后单击“保存密钥”。
+2.  **打开侧边栏：**
+    * 单击 Chrome 工具栏中的扩展程序图标。这将在侧边栏中打开智能助手。
+3.  **与助手互动：**
+    * **总结网页：** 单击“总结当前网页”按钮以获取活动标签页内容的摘要。
+    * **聊天：** 在侧边栏底部的输入字段中键入您的消息，然后按 Enter 键或单击“发送”。
+    * **使用选中文本：** 在任何网页上选择文本。它将出现在侧边栏的“引用内容”部分。然后，您可以在 Prompt 中使用 `{{text}}` 占位符，或者直接就所选文本提问。
+    * **使用图片：** 在网页上右键单击图片，然后选择“用 Gemini 分析图片”。该图片将显示在侧边栏中，然后您可以就该图片提问。
+    * **管理 Prompt：** 单击“管理 Prompt”以打开一个新标签页，您可以在其中添加、编辑或删除自定义 Prompt 模板。在模板中使用 `{{text}}` 可自动插入选定的网页文本。
+    * **Prompt 快捷方式：** 在侧边栏主控制按钮下方直接访问您已保存和预设的 Prompt。
+    * **分割对话：** 单击“分割当前对话”以存档当前对话并开始新的对话。
+    * **查看已存档对话：** 单击“查看已存档对话”以打开一个显示所有已存档对话的页面。
+    * **清除历史记录：** 展开“更多历史操作”部分以清除所有聊天记录。
+
+## 文件结构 (主要文件)
+
+* `manifest.json`: 定义扩展程序的属性、权限和核心文件。
+* `sidebar.html` / `sidebar.js` / `sidebar.css`: 聊天和总结功能的主要界面。
+* `background.js`: Service worker，处理后台任务、API 通信、右键菜单和消息传递。
+* `options.html` / `options.js`: 供用户输入和保存其 Gemini API 密钥的页面。
+* `prompts.html` / `prompts.js` / `prompts.css`: 用于管理 Prompt 模板的界面。
+* `archive.html` / `archive.js` / `archive.css`: 用于查看已存档聊天的界面。
+* `content_script.js`: 注入到网页中以启用文本选择、图片选择和链接拖放总结预览等功能。
+* `link_content_extractor.js`: 使用 Readability.js 库从网页中提取主要内容，尤其适用于总结链接目标。
+* `libs/`: 包含外部库，如 `marked.min.js` (用于渲染 Markdown) 和 `Readability.js`。
+* `images/`: 包含扩展程序的图标。
+
+## 工作原理
+
+该扩展程序利用 Gemini API 实现其核心 AI 功能。
+* **前端 (侧边栏、选项、Prompt、存档)：** 使用 HTML、CSS 和 JavaScript 创建用户界面。
+* **后台脚本 (`background.js`)：**
+    * 管理 API 密钥。
+    * 处理扩展程序不同部分（例如内容脚本、侧边栏）之间的通信。
+    * 处理总结和图片分析请求。
+    * 创建和管理右键菜单。
+    * 协调从外部链接获取和总结内容的过程。
+* **内容脚本 (`content_script.js`)：**
+    * 与用户访问的网页进行交互。
+    * 侦听文本选择和图片选择以发送到侧边栏。
+    * 实现用于总结的链接拖放预览功能。
+    * 在请求总结时提取页面内容。
+* **API 交互 (主要在 `sidebar.js` 中)：**
+    * 使用存储的 API 密钥构建对 Gemini API 的请求。
+    * 将用户 Prompt、选定文本、页面内容和图片数据发送到 API。
+    * 在聊天界面中显示 API 的响应。
+* **存储：**
+    * 使用 `chrome.storage.sync` 存储 Gemini API 密钥。
+    * 使用 `chrome.storage.local` 存储聊天记录、已存档聊天和 Prompt 模板。
 
 ---
 
-## 简介
+## Description
 
-智能侧边栏助手是一款基于 Manifest V3 的 Chrome 浏览器插件，它利用 Google Gemini API 的强大功能，为您提供网页内容总结、链接内容总结和智能对话服务。该插件以可调整宽度的侧边栏形式集成到您的浏览器中，能够“推送”页面内容而非简单覆盖，主要支持中文进行交互，并允许用户设置自己的 Gemini API 密钥。所有对话和存档都将保存在本地，方便回顾和管理。
+This Chrome extension provides an intelligent sidebar assistant powered by the Gemini API. It allows users to summarize web pages, engage in intelligent conversations, and manage custom prompts, with a primary focus on Chinese language support.
 
----
+## Features
 
-## ✨ 功能特性
+* **Web Page Summarization:** Quickly summarize the content of the current web page.
+* **Intelligent Chat:** Converse with the Gemini model directly within the sidebar.
+* **Prompt Management:** Create, edit, and manage custom prompt templates for frequent tasks. Includes preset prompts for translation and summarization.
+* **Chat History:** Saves your conversations with the assistant.
+* **Chat Archiving:** Archive important conversations or Q&A pairs for later review.
+* **Context Menu Integration:**
+    * Analyze images using Gemini by right-clicking on an image.
+    * Summarize link targets by dragging and dropping links onto a preview window or via context menu (implicitly based on `content_script.js` functionality).
+* **Text Selection Integration:** Easily use selected text from a webpage in your prompts.
+* **Image Support:** Include images in your conversations with the AI.
+* **API Key Configuration:** Users can securely save their Gemini API key in the extension's options.
+* **Side Panel UI:** Modern and user-friendly interface within the browser's side panel.
+* **Chinese Language Focused:** UI and default prompts are in Chinese, designed for Chinese-speaking users.
 
-* **动态侧边栏**: 以浏览器原生侧边栏形式常驻，用户可自由拖动调整宽度，不遮挡页面内容。
-* **自定义 API Key**: 用户可在插件选项页面设置并保存自己的 Gemini API 密钥。
-* **中文网页总结**: 一键提取当前活动网页的主要文本内容，并使用 Gemini API 生成中文摘要。
-* **链接内容总结**:
-    * 通过在网页上拖拽链接，会弹出一个包含链接URL和文本的预览小窗。
-    * 点击预览小窗中的“Summarize Link”按钮，插件会在后台静默打开链接，使用 Readability.js 提取其主要内容，并通过 Gemini API 进行总结。
-    * 总结结果将显示在侧边栏聊天区域。
-* **智能对话**:
-    * 与 Gemini AI 模型进行流畅的对话。
-    * AI 的回复支持 Markdown 格式渲染，提供更丰富的展示效果（例如代码块、列表等）。
-    * 自动读取并在对话中引用用户在网页上选择的文本内容，进行上下文相关的提问或指令。
-* **本地对话管理**:
-    * **对话历史**: 自动保存所有主对话记录到浏览器本地存储。提供查看、加载和删除历史对话的功能。
-    * **对话分割**: 当前对话可以被分割，原对话将被存档并保存到历史记录，然后开始一个全新的对话。
-    * **对话存档**:
-        * 可以单独存档聊天中的“一问一答”片段。
-        * 可以将完整的对话会话从历史记录中移至存档区。
-    * **查看存档**: 提供专门的页面查看和管理所有已存档的对话，支持单独删除或清空所有存档。
-* **中文界面与交互**: 插件的主要用户界面和AI交互以中文为主。
+## Installation
 
----
+1.  **Download the Extension Files:** Make sure you have all the extension files in a single folder (e.g., `g-extension`).
+2.  **Open Chrome Extensions Page:**
+    * Open Google Chrome.
+    * Navigate to `chrome://extensions/`.
+3.  **Enable Developer Mode:**
+    * In the top right corner of the Extensions page, toggle the "Developer mode" switch to on.
+4.  **Load Unpacked Extension:**
+    * Click the "Load unpacked" button that appears.
+    * Select the folder containing the extension files (e.g., `g-extension`).
+5.  The extension icon should now appear in your Chrome toolbar.
 
-## 🛠️ 技术栈
+## Usage
 
-* **Manifest V3**: Chrome 扩展平台。
-* **JavaScript**: 扩展核心逻辑 (ESM)。
-* **HTML & CSS**: 侧边栏、选项页和存档页的结构与样式。
-* **Google Gemini API**: 提供AI驱动的总结与对话能力。
-* **`chrome.storage.sync`**: 用于存储用户的 Gemini API 密钥。
-* **`chrome.storage.local`**: 用于存储对话历史和已存档对话。
-* **`Readability.js`**: 用于从链接网页中提取主要可读内容。
-* **`marked.js`**: 用于解析AI回复中的 Markdown 文本，以支持富文本显示。
-
----
-
-## 🚀 快速开始
-
-### 先决条件
-
-1.  一个有效的 Google Gemini API 密钥。您可以从 [Google AI Studio](https://aistudio.google.com/app/apikey) 获取。
-2.  最新版本的 Google Chrome 浏览器。
-
-### 安装步骤
-
-1.  下载或克隆此项目的代码到您的本地计算机。
-2.  打开 Chrome 浏览器，在地址栏输入 `chrome://extensions` 并回车。
-3.  在打开的扩展程序页面中，启用右上角的 “开发者模式” (Developer mode)。
-4.  点击左上角的 “加载已解压的扩展程序” (Load unpacked) 按钮。
-5.  选择您在步骤1中下载或克隆的项目文件夹。
-6.  插件图标应该会出现在 Chrome 工具栏中。
-
-### 配置
-
-1.  安装插件后，右键点击 Chrome 工具栏中的插件图标，选择 “选项” (Options)。或者，在 `chrome://extensions` 页面找到该插件，点击 “详细信息”，然后选择 “扩展程序选项”。
-2.  在打开的选项页面中，输入您的 Gemini API 密钥。
-3.  点击 “保存密钥” (Save Key) 按钮。成功保存后会有提示。
-
----
-
-## 📖 使用指南
-
-### 打开/关闭侧边栏
-
-* 点击 Chrome 工具栏中的插件图标即可打开或关闭侧边栏。
-
-### 总结当前网页
-
-1.  打开您想要总结的网页。
-2.  打开侧边栏。
-3.  点击侧边栏顶部的 “总结当前网页 (中文)” 按钮。
-4.  总结结果将显示在聊天区域。
-
-### 总结链接内容
-
-1.  在任何网页上，找到您想要总结内容的链接。
-2.  用鼠标左键按住该链接并开始拖拽。
-3.  一个包含链接URL和文本的小型预览窗口会出现在页面右下角。
-4.  松开鼠标（不必将链接拖到特定位置，拖拽动作本身会触发预览）。
-5.  预览窗口将保持可见。点击预览窗口中的 “Summarize Link” 按钮。
-6.  插件将在后台打开该链接并提取其主要内容，然后发送给 Gemini API 进行总结。
-7.  总结结果（中文）最终会显示在侧边栏的聊天区域。
-
-### 与AI对话
-
-1.  打开侧边栏。
-2.  在底部的文本输入框中输入您的问题或指令。
-3.  点击 “发送” 按钮或按 Ctrl/Cmd + Enter 键。
-4.  AI 的回复将以 Markdown 格式渲染并显示在聊天区域。
-
-### 使用选中文本
-
-1.  在任何网页上，用鼠标选择一段文本。
-2.  打开侧边栏（如果尚未打开）。
-3.  选中的文本会自动显示在侧边栏输入框上方作为一个引用提示。
-4.  您可以在输入框中继续输入与此引用内容相关的问题或指令，然后发送。AI 将结合引用内容进行回复。
-5.  可以点击引用提示旁的“清除”按钮来取消引用。
-
-### 管理对话历史
-
-1.  打开侧边栏，底部的历史记录面板会显示最近的对话。
-2.  在历史记录面板中：
-    * 点击任一条目以加载该对话到当前聊天窗口。
-    * 点击条目旁的 “存档” 按钮可以将该完整对话移动到存档区。
-    * 点击条目旁的 “删除” 按钮以删除该条对话记录。
-    * 点击历史记录面板底部的 “清除所有历史” 按钮以删除所有已保存的对话（不包括已存档的）。
-
-### 分割对话
-
-1.  在侧边栏中，点击顶部的 “分割当前对话” 按钮。
-2.  当前正在进行的对话将被完整地移动到“已存档对话”中，并同时在常规“对话历史”中保存一份。
-3.  侧边栏聊天区域将被清空，开始一个全新的对话。
-
-### 存档对话片段
-
-1.  在AI的回复消息下方，如果该消息尚未存档，会有一个文件夹图标 (📁)。
-2.  点击该图标，对应的AI回复及其前一条用户提问将作为一个问答(Q&A)对被添加到“已存档对话”中。
-3.  原消息下方会显示“已存档”字样。
-
-### 查看已存档对话
-
-1.  打开侧边栏。
-2.  点击顶部的 “查看已存档对话 (数量)” 按钮。
-3.  这会打开一个新的浏览器标签页，显示所有已存档的对话和问答对。
-4.  在此页面，您可以展开查看每个存档的内容，或将其永久删除。可以单独删除，也可以清空所有存档。
-
-### 调整侧边栏大小
-
-* 将鼠标悬停在侧边栏的内边缘（靠近页面内容的一侧），当光标变为水平调整样式时，按住鼠标左键并拖动即可调整侧边栏的宽度。浏览器会自动记住调整后的宽度。
-
----
-
-## 📁 项目结构 (主要文件)
-
-```
-g-extension/
-├── manifest.json                # 插件清单文件
-├── background.js                # 后台服务工作脚本
-├── content_script.js            # 内容脚本 (处理页面交互，如拖拽链接预览、文本选择)
-├── link_content_extractor.js    # 注入到临时标签页，使用Readability提取链接内容
-├── sidebar.html                 # 侧边栏界面
-├── sidebar.js                   # 侧边栏逻辑脚本
-├── sidebar.css                  # 侧边栏样式
-├── archive.html                 # 已存档对话查看页面
-├── archive.js                   # 已存档对话页面的逻辑脚本
-├── archive.css                  # 已存档对话页面的样式
-├── options.html                 # API密钥等设置页面
-├── options.js                   # 设置页面的逻辑脚本
-├── options.css                  # 设置页面的样式
-├── libs/
-│   ├── Readability.js           # 用于提取网页正文的库
-│   └── marked.min.js            # Markdown 解析库
-└── images/                      # 插件图标 (icon16.png, icon48.png, icon128.png)
-```
-
-
----
-
-## ⚠️ 已知问题与限制
-
-* **页面兼容性**:
-    * 侧边栏的实现依赖于标准的浏览器功能，但在极少数结构特别复杂或使用特定JavaScript框架的网站上可能出现显示异常。
-    * 拖拽链接以激活预览窗口的功能在某些特殊页面（如iframe较多或有自定义拖拽处理的页面）可能不够灵敏或无法正常交互。
-* **API 密钥安全**: 您的 Gemini API 密钥存储在浏览器的同步存储中 (`chrome.storage.sync`)。请注意保护好您的密钥，不要在不信任的计算机上使用。密钥的安全性由用户负责。
-* **内容提取**:
-    * **当前页面总结**: 仍使用 `document.body.innerText` 提取当前页面的内容，对于包含大量非主要文本（如评论、导航链接、广告脚本残留文本）的页面，总结效果可能会受到影响，可能不够精确。
-    * **链接内容总结**: 使用 `Readability.js` 提取主要内容，通常效果较好，但仍可能在某些特殊页面结构或动态加载内容非常多的网站上提取不完整或不准确。
-* **错误处理**: 虽然进行了一些错误处理，但可能仍有未覆盖到的场景，例如链接页面加载超时、网络请求失败或API返回非预期错误。
-* **长对话性能**: 非常长的对话历史可能会轻微影响侧边栏加载速度，尽管已实现分页或虚拟滚动等优化。对话历史上限当前设定为50条。
-
----
-
-## 展望未来
-
-* **改进当前页面内容提取**: 为当前页面总结功能也集成 `Readability.js` 或类似方案，以提高内容提取质量和准确性。
-* **右键菜单快捷操作**:
-    * 增加右键选择文本后直接发送到侧边栏进行提问或处理的选项。
-    * 增加右键点击链接时，直接发送链接到侧边栏进行总结的选项。
-* **对话标题与搜索**:
-    * 允许用户为对话历史和存档条目自定义标题。
-    * 在对话历史和存档中实现关键词搜索功能。
-* **高级对话管理**:
-    * 支持在对话中编辑已发送的消息。
-    * 更灵活的对话合并或消息移动功能。
-* **多语言支持**: 增加对更多语言的界面和AI交互支持。
-* **用户自定义 Prompts**: 允许用户保存和使用自定义的提示词模板，以快速执行特定任务。
-* **AI回复流式输出**: 实现AI回复的流式（打字机效果）输出，而不是等待完整回复后再显示，以改善用户体验。
-* **更细致的错误提示与引导**: 提供更友好和具体的错误信息，并给出可能的解决方案。
-* **主题定制**: 允许用户选择不同的侧边栏主题（如暗色模式）。
-
----
-
-## 许可证
-
-此项目采用 [MIT 许可证](LICENSE)。
+1.  **Set API Key:**
+    * Right-click on the extension icon in the Chrome toolbar and select "Options," or navigate to the extension's options page.
+    * Enter your Gemini API key and click "Save Key."
+2.  **Open the Sidebar:**
+    * Click on the extension icon in the Chrome toolbar. This will open the intelligent assistant in the side panel.
+3.  **Interacting with the Assistant:**
+    * **Summarize Page:** Click the "总结当前网页" (Summarize Current Page) button to get a summary of the active tab's content.
+    * **Chat:** Type your messages in the input field at the bottom of the sidebar and press Enter or click "发送" (Send).
+    * **Use Selected Text:** Select text on any webpage. It will appear in the "引用内容" (Quoted Content) section in the sidebar. You can then use the `{{text}}` placeholder in your prompts or simply ask questions about the selected text.
+    * **Use Images:** Right-click an image on a webpage and select "用 Gemini 分析图片" (Analyze Image with Gemini). The image will appear in the sidebar, and you can then ask questions about it.
+    * **Manage Prompts:** Click "管理 Prompt" (Manage Prompts) to open a new tab where you can add, edit, or delete custom prompt templates. Use `{{text}}` in your templates to automatically insert selected page text.
+    * **Prompt Shortcuts:** Access your saved and preset prompts directly below the main control buttons in the sidebar.
