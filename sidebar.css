@@ -1,123 +1,411 @@
-/* Add or adjust existing styles in sidebar.css */
-body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; font-size: 14px; }
-.sidebar-container { padding: 10px; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
+/* sidebar.css - Beautified Version (AI messages full width) */
+:root {
+  --sidebar-bg-color: #f8f9fa;
+  --primary-text-color: #212529;
+  --secondary-text-color: #495057;
+  --light-text-color: #6c757d;
+  --border-color: #dee2e6;
+  --hover-bg-color: #e9ecef;
+  --active-bg-color: #d1d9e0;
 
-.controls { 
-    display: flex; 
-    flex-wrap: wrap;
-    gap: 5px; 
-    margin-bottom: 10px; 
-    padding-bottom: 10px;
-    border-bottom: 1px solid #ccc;
+  --user-message-bg: #e7f3ff;
+  --user-message-text: #0056b3;
+  --ai-message-bg: #f1f3f5;
+  --ai-message-text: #343a40;
+
+  --primary-button-bg: #007bff;
+  --primary-button-hover-bg: #0056b3;
+  --primary-button-text: #ffffff;
+
+  --destructive-button-bg: #dc3545;
+  --destructive-button-hover-bg: #c82333;
+  --destructive-button-text: #ffffff;
+
+  --control-button-bg: #6c757d;
+  --control-button-hover-bg: #5a6268;
+  --control-button-text: #ffffff;
+
+  --font-family-sans-serif: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --border-radius: 6px;
+  --input-focus-border: #80bdff;
+  --input-focus-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
-.controls button { 
-    padding: 8px 10px; 
-    flex-grow: 1; 
-    min-width: 120px; 
-    border: 1px solid #ccc;
-    background-color: #f0f0f0;
-    cursor: pointer;
-    border-radius: 4px;
+
+body {
+  margin: 0;
+  font-family: var(--font-family-sans-serif);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--primary-text-color);
+  background-color: var(--sidebar-bg-color);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden; /* Prevent body scroll, individual sections will scroll */
 }
+
+.sidebar-container {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  gap: 12px; /* Spacing between main sections */
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.controls button {
+  padding: 8px 12px;
+  flex-grow: 1;
+  min-width: 120px;
+  border: none;
+  background-color: var(--control-button-bg);
+  color: var(--control-button-text);
+  cursor: pointer;
+  border-radius: var(--border-radius);
+  font-size: 0.9em;
+  transition: background-color 0.15s ease-in-out;
+  text-align: center;
+}
+
 .controls button:hover {
-    background-color: #e0e0e0;
+  background-color: var(--control-button-hover-bg);
 }
 
-
-.chat-area { flex-grow: 1; display: flex; flex-direction: column; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px; }
-#chatOutput { flex-grow: 1; overflow-y: auto; margin-bottom: 10px; padding: 5px; border: 1px solid #eee; min-height: 150px;}
-.message { margin-bottom: 8px; padding: 8px 10px; border-radius: 6px; line-height: 1.4; position: relative; } /* Added position relative */
-.message.user { background-color: #e1f5fe; text-align: left; margin-left: 0; margin-right: 20%; }
-.message.ai { background-color: #f0f0f0; margin-left: 20%; margin-right: 0; }
-
-.message-content-wrapper { /* New wrapper for actual content */
-    padding-bottom: 5px; /* Space for footer */
+.chat-area {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0; /* Allows chatOutput to shrink and grow properly */
 }
+
+#chatOutput {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background-color: #ffffff;
+  min-height: 150px; /* Ensure it has some height */
+}
+
+.message {
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border-radius: var(--border-radius);
+  line-height: 1.6;
+  position: relative;
+  word-wrap: break-word;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.message.user {
+  background-color: var(--user-message-bg);
+  color: var(--user-message-text);
+  margin-right: 20%; /* Indent user messages from the right */
+}
+
+.message.ai {
+  background-color: var(--ai-message-bg);
+  color: var(--ai-message-text);
+  /* margin-left: 20%; Removed for full width */
+  /* align-self: flex-end; Removed as not applicable in this context */
+}
+
+.message-content-wrapper {
+  padding-bottom: 5px; /* Space for footer */
+}
+.message-content-wrapper p:last-child {
+  margin-bottom: 0;
+}
+.message-content-wrapper pre {
+  background-color: #e9ecef;
+  padding: 10px;
+  border-radius: var(--border-radius);
+  overflow-x: auto;
+  font-size: 0.9em;
+}
+.message-content-wrapper code {
+  background-color: rgba(0,0,0,0.04);
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  border-radius: 3px;
+}
+.message-content-wrapper pre code {
+  background-color: transparent;
+  padding: 0;
+  margin: 0;
+  font-size: inherit;
+  border-radius: 0;
+}
+
 
 .message-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.75em;
-    color: #666;
-    margin-top: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8em;
+  color: var(--light-text-color);
+  margin-top: 6px;
 }
 
-.timestamp { 
-    /* font-size: 0.75em; color: #666; display: block; margin-top: 4px; */ 
-    /* No longer block, part of footer */
+.timestamp {
+  /* No specific styles needed if footer handles it */
 }
 
 .archive-action {
-    margin-left: 10px;
-    cursor: pointer;
-    font-size: 0.9em; /* Smaller than timestamp for balance */
+  margin-left: 10px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: color 0.15s ease-in-out;
 }
+
 .archive-icon {
-    color: #007bff;
+  color: var(--primary-button-bg);
+  font-family: 'Courier New', Courier, monospace; /* For a simple folder icon */
+  font-weight: bold;
 }
 .archive-icon:hover {
-    color: #0056b3;
+  color: var(--primary-button-hover-bg);
 }
+
 .archived-text {
-    color: #5cb85c; /* Green for archived */
-    font-style: italic;
-    cursor: default;
+  color: #28a745; /* Green for archived */
+  font-style: italic;
+  cursor: default;
+}
+
+#selectedTextPreview {
+  font-size: 0.9em;
+  background-color: #fff3cd; /* Light yellow for emphasis */
+  color: #856404;
+  padding: 8px 12px;
+  border: 1px solid #ffeeba;
+  border-radius: var(--border-radius);
+  display: flex; /* For aligning text and clear button */
+  justify-content: space-between;
+  align-items: center;
+}
+#selectedTextContent {
+  flex-grow: 1;
+  margin-right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#clearSelectedTextButton {
+  background: none;
+  border: none;
+  color: #856404;
+  font-size: 1em; /* Relative to parent */
+  padding: 2px 5px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+#clearSelectedTextButton:hover {
+  background-color: rgba(0,0,0,0.05);
+}
+
+#chatInput {
+  width: 100%; /* Takes full width of its container */
+  min-height: 70px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-sizing: border-box; /* Include padding and border in element's total width and height */
+  font-family: inherit;
+  font-size: 1em;
+  line-height: 1.5;
+  resize: vertical; /* Allow vertical resizing */
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+#chatInput:focus {
+  border-color: var(--input-focus-border);
+  outline: 0;
+  box-shadow: var(--input-focus-shadow);
+}
+
+#sendMessageButton {
+  padding: 10px 15px;
+  width: 100%;
+  background-color: var(--primary-button-bg);
+  color: var(--primary-button-text);
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 1em;
+  transition: background-color 0.15s ease-in-out;
+}
+#sendMessageButton:hover {
+  background-color: var(--primary-button-hover-bg);
+}
+#sendMessageButton:disabled {
+  background-color: #ced4da;
+  cursor: not-allowed;
 }
 
 
-#selectedTextPreview { font-size: 0.9em; background-color: #f9f9f9; }
-#chatInput { width: calc(100% - 12px); min-height: 70px; margin-bottom: 5px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
-#sendMessageButton { padding: 10px 15px; width: 100%; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-#sendMessageButton:hover { background-color: #0056b3; }
+.history-panel {
+  border-top: 1px solid var(--border-color);
+  padding-top: 12px;
+  /* max-height can be adjusted based on preference, or use flex basis */
+  max-height: 30%; /* Example: Limit history panel height */
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: #ffffff;
+  padding: 10px;
+  border-radius: var(--border-radius);
+  box-shadow: 0 -1px 5px rgba(0,0,0,0.03); /* Subtle shadow at the top */
+}
 
-.history-panel { 
-    border-top: 1px solid #ccc; 
-    padding-top: 10px; 
-    margin-top: 10px; 
-    max-height: 35%; 
-    overflow-y: auto; 
-    display: block !important;
+.history-panel h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--primary-text-color);
 }
-.history-panel h3 { margin-top: 0; margin-bottom: 10px; font-size: 1em; font-weight: bold; }
-.history-item { 
-    padding: 8px 10px; 
-    border-bottom: 1px solid #eee; 
-    cursor: pointer; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center;
+
+#chatHistoryList {
+  overflow-y: auto; /* Allow scroll within the list if it gets too long */
+  flex-grow: 1; /* Takes available space before clear button */
 }
-.history-item:hover { background-color: #f9f9f9; }
+
+.history-item {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background-color 0.15s ease-in-out;
+  border-radius: 4px; /* Slight radius for items */
+}
+.history-item:last-child {
+  border-bottom: none;
+}
+.history-item:hover {
+  background-color: var(--hover-bg-color);
+}
+
 .history-item-title {
-    flex-grow: 1;
-    margin-right: 10px;
-    font-size: 0.9em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  flex-grow: 1;
+  margin-right: 10px;
+  font-size: 0.9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--secondary-text-color);
 }
+.history-item:hover .history-item-title {
+    color: var(--primary-text-color);
+}
+
+
 .history-item-buttons button {
-    margin-left: 5px;
-    padding: 3px 6px;
-    font-size: 0.8em;
-    cursor: pointer;
-    border: 1px solid #ddd;
-    background-color: #fff;
-    border-radius: 3px;
+  margin-left: 5px;
+  padding: 4px 8px;
+  font-size: 0.8em;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background-color: #fff;
+  border-radius: var(--border-radius);
+  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+  color: var(--secondary-text-color);
 }
-.history-item-buttons button.archive-btn:hover { background-color: #e6f7ff; border-color: #91d5ff; }
-.history-item-buttons button.delete-btn:hover { background-color: #ffebe6; border-color: #ffccc7; }
+.history-item-buttons button.archive-btn:hover {
+  background-color: #e6f7ff;
+  border-color: #91d5ff;
+  color: #0056b3;
+}
+.history-item-buttons button.delete-btn:hover {
+  background-color: #fff5f5;
+  border-color: #ffccc7;
+  color: #dc3545;
+}
+
 
 #clearAllHistoryButton {
-    display: block;
-    width: calc(100% - 20px);
-    margin: 10px auto 0 auto;
-    padding: 8px;
-    background-color: #ff4d4f;
-    color: white;
-    border: none;
-    border-radius: 4px;
+  display: block;
+  width: 100%; /* Full width of its container */
+  margin-top: 8px; /* Space from history list */
+  padding: 9px 12px;
+  background-color: var(--destructive-button-bg);
+  color: var(--destructive-button-text);
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 0.9em;
+  text-align: center;
+  transition: background-color 0.15s ease-in-out;
 }
-#clearAllHistoryButton:hover { background-color: #d9363e; }
-.temporary-status { font-style: italic; color: #777; }
+#clearAllHistoryButton:hover {
+  background-color: var(--destructive-button-hover-bg);
+}
+
+.temporary-status {
+  font-style: italic;
+  color: var(--light-text-color);
+  background-color: var(--sidebar-bg-color); /* Match sidebar background */
+  padding: 8px 10px;
+  text-align: center;
+  border: 1px dashed var(--border-color);
+}
+
+/* Scrollbar styling (optional, browser-specific) */
+#chatOutput::-webkit-scrollbar,
+.history-panel::-webkit-scrollbar,
+#chatHistoryList::-webkit-scrollbar {
+  width: 8px;
+}
+
+#chatOutput::-webkit-scrollbar-track,
+.history-panel::-webkit-scrollbar-track,
+#chatHistoryList::-webkit-scrollbar-track {
+  background: transparent; /* Or var(--sidebar-bg-color) */
+}
+
+#chatOutput::-webkit-scrollbar-thumb,
+.history-panel::-webkit-scrollbar-thumb,
+#chatHistoryList::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 10px;
+  border: 2px solid transparent; /* Creates padding around thumb */
+  background-clip: content-box;
+}
+
+#chatOutput::-webkit-scrollbar-thumb:hover,
+.history-panel::-webkit-scrollbar-thumb:hover,
+#chatHistoryList::-webkit-scrollbar-thumb:hover {
+  background-color: var(--light-text-color);
+}
+
+/* Basic styling for markdown elements from marked.js */
+.message-content-wrapper ul,
+.message-content-wrapper ol {
+  padding-left: 20px;
+}
+.message-content-wrapper blockquote {
+  border-left: 3px solid var(--border-color);
+  padding-left: 10px;
+  margin-left: 0;
+  color: var(--secondary-text-color);
+  font-style: italic;
+}
+.message-content-wrapper a {
+    color: var(--primary-button-bg);
+    text-decoration: none;
+}
+.message-content-wrapper a:hover {
+    text-decoration: underline;
+}
