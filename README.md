@@ -1,85 +1,59 @@
-# 侧边栏助手 (Gemini) / Sidebar Assistant (Gemini)
+# 智能侧边栏助手 (Gemini)
 
 ---
 
-## 简介 / Introduction
+## 简介
 
-🇨🇳 **中文**:
-智能侧边栏助手是一款基于 Manifest V3 的 Chrome 浏览器插件，它利用 Google Gemini API 的强大功能，为您提供网页内容总结、链接内容总结和智能对话服务。该插件以可调整宽度的侧边栏形式集成到您的浏览器中，能够“推送”页面内容而非简单覆盖，支持中文进行交互，并允许用户设置自己的 Gemini API 密钥。所有对话都将保存在本地，方便回顾和管理。
-
-🇬🇧 **English**:
-The Smart Sidebar Assistant is a Manifest V3 Chrome extension that leverages the power of the Google Gemini API to provide webpage summarization, link content summarization, and intelligent chat services. It integrates into your browser as a resizable sidebar that "pushes" page content rather than overlaying it, supports interaction in Chinese, and allows users to set their own Gemini API key. All conversations are saved locally for easy review and management.
+智能侧边栏助手是一款基于 Manifest V3 的 Chrome 浏览器插件，它利用 Google Gemini API 的强大功能，为您提供网页内容总结、链接内容总结和智能对话服务。该插件以可调整宽度的侧边栏形式集成到您的浏览器中，能够“推送”页面内容而非简单覆盖，主要支持中文进行交互，并允许用户设置自己的 Gemini API 密钥。所有对话和存档都将保存在本地，方便回顾和管理。
 
 ---
 
-## ✨ 功能特性 / Features
+## ✨ 功能特性
 
-🇨🇳 **中文**:
-* **动态侧边栏**: 以侧边栏形式常驻，不遮挡页面内容，宽度可自由拖动调整。
+* **动态侧边栏**: 以浏览器原生侧边栏形式常驻，用户可自由拖动调整宽度，不遮挡页面内容。
 * **自定义 API Key**: 用户可在插件选项页面设置并保存自己的 Gemini API 密钥。
-* **中文网页总结**: 一键提取当前网页主要内容，并使用 Gemini API 生成中文摘要。
+* **中文网页总结**: 一键提取当前活动网页的主要文本内容，并使用 Gemini API 生成中文摘要。
 * **链接内容总结**:
-    * 通过在网页上拖拽链接，会弹出一个预览小窗。
-    * 点击预览小窗中的“Summarize Link”按钮，即可请求总结该链接指向页面的内容。
+    * 通过在网页上拖拽链接，会弹出一个包含链接URL和文本的预览小窗。
+    * 点击预览小窗中的“Summarize Link”按钮，插件会在后台静默打开链接，使用 Readability.js 提取其主要内容，并通过 Gemini API 进行总结。
     * 总结结果将显示在侧边栏聊天区域。
 * **智能对话**:
-    * 与 Gemini AI进行流畅的对话。
-    * AI 的回复支持 Markdown 格式渲染，提供更丰富的展示效果。
-    * 自动读取并在对话中引用用户在网页上选择的文本内容。
-* **本地对话历史**:
-    * 自动保存所有对话记录到本地浏览器存储。
-    * 提供查看、加载和删除历史对话的功能。
-    * (基础) 支持从历史记录中将对话作为新对话开始（分割）。
-* **多语言界面**: 主要交互以中文为主。
-
-🇬🇧 **English**:
-* **Dynamic Sidebar**: A persistent sidebar that pushes page content and can be freely resized by dragging.
-* **Custom API Key**: Users can set and save their own Gemini API key in the extension's options page.
-* **Chinese Webpage Summarization**: One-click extraction of main webpage content, summarized in Chinese using the Gemini API.
-* **Link Content Summarization**:
-    * Dragging a link on a webpage will show a small preview window.
-    * Clicking the "Summarize Link" button in the preview window will request a summary of the linked page's content.
-    * The summary will be displayed in the sidebar chat area.
-* **Intelligent Chat**:
-    * Engage in fluent conversations with the Gemini AI.
-    * AI responses are rendered from Markdown for a richer display.
-    * Automatically reads and incorporates user-selected text from the webpage into the conversation context.
-* **Local Chat History**:
-    * Automatically saves all conversation logs to local browser storage.
-    * Provides functionality to view, load, and delete chat history.
-    * (Basic) Supports starting a new conversation from a historical one (splitting).
-* **Multilingual Interface**: Primary interaction is in Chinese.
+    * 与 Gemini AI 模型进行流畅的对话。
+    * AI 的回复支持 Markdown 格式渲染，提供更丰富的展示效果（例如代码块、列表等）。
+    * 自动读取并在对话中引用用户在网页上选择的文本内容，进行上下文相关的提问或指令。
+* **本地对话管理**:
+    * **对话历史**: 自动保存所有主对话记录到浏览器本地存储。提供查看、加载和删除历史对话的功能。
+    * **对话分割**: 当前对话可以被分割，原对话将被存档并保存到历史记录，然后开始一个全新的对话。
+    * **对话存档**:
+        * 可以单独存档聊天中的“一问一答”片段。
+        * 可以将完整的对话会话从历史记录中移至存档区。
+    * **查看存档**: 提供专门的页面查看和管理所有已存档的对话，支持单独删除或清空所有存档。
+* **中文界面与交互**: 插件的主要用户界面和AI交互以中文为主。
 
 ---
 
-## 🛠️ 技术栈 / Tech Stack
+## 🛠️ 技术栈
 
-* **Manifest V3**: Chrome Extension platform.
-* **JavaScript**: Core logic for the extension, content scripts, background scripts, and UI.
-* **HTML & CSS**: Structure and styling for the sidebar and options page.
-* **Google Gemini API**: For AI-powered summarization and chat.
-* **`chrome.storage.sync`**: For storing the user's API key.
-* **`chrome.storage.local`**: For storing chat history.
-* **`Readability.js`**: For extracting the main content from linked webpages.
-* **`marked.js`**: For parsing Markdown in AI responses.
+* **Manifest V3**: Chrome 扩展平台。
+* **JavaScript**: 扩展核心逻辑 (ESM)。
+* **HTML & CSS**: 侧边栏、选项页和存档页的结构与样式。
+* **Google Gemini API**: 提供AI驱动的总结与对话能力。
+* **`chrome.storage.sync`**: 用于存储用户的 Gemini API 密钥。
+* **`chrome.storage.local`**: 用于存储对话历史和已存档对话。
+* **`Readability.js`**: 用于从链接网页中提取主要可读内容。
+* **`marked.js`**: 用于解析AI回复中的 Markdown 文本，以支持富文本显示。
 
 ---
 
-## 🚀 快速开始 / Getting Started
+## 🚀 快速开始
 
-### 先决条件 / Prerequisites
+### 先决条件
 
-🇨🇳 **中文**:
 1.  一个有效的 Google Gemini API 密钥。您可以从 [Google AI Studio](https://aistudio.google.com/app/apikey) 获取。
 2.  最新版本的 Google Chrome 浏览器。
 
-🇬🇧 **English**:
-1.  A valid Google Gemini API key. You can obtain one from [Google AI Studio](https://aistudio.google.com/app/apikey).
-2.  The latest version of the Google Chrome browser.
+### 安装步骤
 
-### 安装步骤 / Installation
-
-🇨🇳 **中文**:
 1.  下载或克隆此项目的代码到您的本地计算机。
 2.  打开 Chrome 浏览器，在地址栏输入 `chrome://extensions` 并回车。
 3.  在打开的扩展程序页面中，启用右上角的 “开发者模式” (Developer mode)。
@@ -87,197 +61,146 @@ The Smart Sidebar Assistant is a Manifest V3 Chrome extension that leverages the
 5.  选择您在步骤1中下载或克隆的项目文件夹。
 6.  插件图标应该会出现在 Chrome 工具栏中。
 
-🇬🇧 **English**:
-1.  Download or clone this project's code to your local machine.
-2.  Open the Chrome browser, type `chrome://extensions` in the address bar, and press Enter.
-3.  On the extensions page, enable "Developer mode" using the toggle switch in the top right corner.
-4.  Click the "Load unpacked" button that appears in the top left.
-5.  Select the project folder you downloaded or cloned in step 1.
-6.  The extension icon should now appear in your Chrome toolbar.
+### 配置
 
-### 配置 / Configuration
-
-🇨🇳 **中文**:
 1.  安装插件后，右键点击 Chrome 工具栏中的插件图标，选择 “选项” (Options)。或者，在 `chrome://extensions` 页面找到该插件，点击 “详细信息”，然后选择 “扩展程序选项”。
 2.  在打开的选项页面中，输入您的 Gemini API 密钥。
 3.  点击 “保存密钥” (Save Key) 按钮。成功保存后会有提示。
 
-🇬🇧 **English**:
-1.  After installation, right-click the extension icon in the Chrome toolbar and select "Options." Alternatively, go to `chrome://extensions`, find the extension, click "Details," and then "Extension options."
-2.  In the options page that opens, enter your Gemini API key.
-3.  Click the "Save Key" button. A success message will appear upon successful saving.
-
 ---
 
-## 📖 使用指南 / How to Use
+## 📖 使用指南
 
-### 打开/关闭侧边栏 / Opening/Closing Sidebar
+### 打开/关闭侧边栏
 
-🇨🇳 **中文**:
 * 点击 Chrome 工具栏中的插件图标即可打开或关闭侧边栏。
 
-🇬🇧 **English**:
-* Click the extension icon in the Chrome toolbar to open or close the sidebar.
+### 总结当前网页
 
-### 总结网页 / Summarizing Webpages
-
-🇨🇳 **中文**:
 1.  打开您想要总结的网页。
 2.  打开侧边栏。
 3.  点击侧边栏顶部的 “总结当前网页 (中文)” 按钮。
 4.  总结结果将显示在聊天区域。
 
-🇬🇧 **English**:
-1.  Navigate to the webpage you want to summarize.
-2.  Open the sidebar.
-3.  Click the "Summarize Current Webpage (Chinese)" button at the top of the sidebar.
-4.  The summary will be displayed in the chat area.
+### 总结链接内容
 
-### 总结链接内容 / Summarizing Link Content
-
-🇨🇳 **中文**:
 1.  在任何网页上，找到您想要总结内容的链接。
 2.  用鼠标左键按住该链接并开始拖拽。
 3.  一个包含链接URL和文本的小型预览窗口会出现在页面右下角。
-4.  将鼠标拖到浏览器窗口的其他任意位置（不必拖到预览窗口上），然后松开鼠标。
+4.  松开鼠标（不必将链接拖到特定位置，拖拽动作本身会触发预览）。
 5.  预览窗口将保持可见。点击预览窗口中的 “Summarize Link” 按钮。
-6.  插件将在后台打开该链接（在一个临时的、不可见的标签页中）并使用 Readability.js 提取其主要内容。
-7.  提取到的内容将发送给 Gemini API 进行总结，总结结果（中文）最终会显示在侧边栏的聊天区域。
+6.  插件将在后台打开该链接并提取其主要内容，然后发送给 Gemini API 进行总结。
+7.  总结结果（中文）最终会显示在侧边栏的聊天区域。
 
-🇬🇧 **English**:
-1.  On any webpage, find a link whose content you want to summarize.
-2.  Press and hold the left mouse button on the link and start dragging it.
-3.  A small preview window containing the link's URL and text will appear at the bottom right of the page.
-4.  Drag the mouse anywhere else in the browser window (you don't need to drag it onto the preview window) and release the mouse button.
-5.  The preview window will remain visible. Click the "Summarize Link" button within the preview window.
-6.  The extension will open the link in the background (in a temporary, invisible tab) and use Readability.js to extract its main content.
-7.  The extracted content will be sent to the Gemini API for summarization, and the summary (in Chinese) will be displayed in the sidebar chat area.
+### 与AI对话
 
-### 与AI对话 / Chatting with AI
-
-🇨🇳 **中文**:
 1.  打开侧边栏。
 2.  在底部的文本输入框中输入您的问题或指令。
 3.  点击 “发送” 按钮或按 Ctrl/Cmd + Enter 键。
 4.  AI 的回复将以 Markdown 格式渲染并显示在聊天区域。
 
-🇬🇧 **English**:
-1.  Open the sidebar.
-2.  Type your question or command in the text input field at the bottom.
-3.  Click the "Send" button or press Ctrl/Cmd + Enter.
-4.  The AI's response will be rendered from Markdown and appear in the chat area.
+### 使用选中文本
 
-### 使用选中文本 / Using Selected Text
-
-🇨🇳 **中文**:
 1.  在任何网页上，用鼠标选择一段文本。
 2.  打开侧边栏（如果尚未打开）。
 3.  选中的文本会自动显示在侧边栏输入框上方作为一个引用提示。
 4.  您可以在输入框中继续输入与此引用内容相关的问题或指令，然后发送。AI 将结合引用内容进行回复。
+5.  可以点击引用提示旁的“清除”按钮来取消引用。
 
-🇬🇧 **English**:
-1.  On any webpage, select a piece of text with your mouse.
-2.  Open the sidebar (if not already open).
-3.  The selected text will automatically appear as a reference cue above the sidebar's input field.
-4.  You can then type your question or instruction related to this selected text in the input field and send it. The AI will respond considering the referenced text.
+### 管理对话历史
 
-### 管理对话历史 / Managing Chat History
-
-🇨🇳 **中文**:
-1.  打开侧边栏。
-2.  点击 “查看/隐藏对话历史” 按钮来显示或隐藏历史记录面板。
-3.  在历史记录面板中：
+1.  打开侧边栏，底部的历史记录面板会显示最近的对话。
+2.  在历史记录面板中：
     * 点击任一条目以加载该对话到当前聊天窗口。
+    * 点击条目旁的 “存档” 按钮可以将该完整对话移动到存档区。
     * 点击条目旁的 “删除” 按钮以删除该条对话记录。
-    * 点击 “清除所有历史” 按钮以删除所有已保存的对话。
+    * 点击历史记录面板底部的 “清除所有历史” 按钮以删除所有已保存的对话（不包括已存档的）。
 
-🇬🇧 **English**:
-1.  Open the sidebar.
-2.  Click the "View/Hide Chat History" button to show or hide the history panel.
-3.  In the history panel:
-    * Click any entry to load that conversation into the current chat window.
-    * Click the "Delete" button next to an entry to delete that specific conversation.
-    * Click the "Clear All History" button to delete all saved conversations.
+### 分割对话
 
-### 调整侧边栏大小 / Resizing Sidebar
+1.  在侧边栏中，点击顶部的 “分割当前对话” 按钮。
+2.  当前正在进行的对话将被完整地移动到“已存档对话”中，并同时在常规“对话历史”中保存一份。
+3.  侧边栏聊天区域将被清空，开始一个全新的对话。
 
-🇨🇳 **中文**:
-* 将鼠标悬停在侧边栏的左边缘，当光标变为水平调整样式时，按住鼠标左键并拖动即可调整侧边栏的宽度。
-* 调整后的宽度会自动保存，并在下次打开时生效。
+### 存档对话片段
 
-🇬🇧 **English**:
-* Hover your mouse cursor over the left edge of the sidebar. When the cursor changes to a horizontal resize icon, click and drag to adjust the sidebar's width.
-* The adjusted width is automatically saved and will be applied the next time you open the sidebar.
+1.  在AI的回复消息下方，如果该消息尚未存档，会有一个文件夹图标 (📁)。
+2.  点击该图标，对应的AI回复及其前一条用户提问将作为一个问答(Q&A)对被添加到“已存档对话”中。
+3.  原消息下方会显示“已存档”字样。
+
+### 查看已存档对话
+
+1.  打开侧边栏。
+2.  点击顶部的 “查看已存档对话 (数量)” 按钮。
+3.  这会打开一个新的浏览器标签页，显示所有已存档的对话和问答对。
+4.  在此页面，您可以展开查看每个存档的内容，或将其永久删除。可以单独删除，也可以清空所有存档。
+
+### 调整侧边栏大小
+
+* 将鼠标悬停在侧边栏的内边缘（靠近页面内容的一侧），当光标变为水平调整样式时，按住鼠标左键并拖动即可调整侧边栏的宽度。浏览器会自动记住调整后的宽度。
 
 ---
 
-## 📁 项目结构 / Project Structure (Simplified)
+## 📁 项目结构 (主要文件)
+
 ```
-gemini-sidebar-extension/
-├── manifest.json                # 插件清单文件 / Extension manifest file
-├── background.js                # 后台服务工作脚本 / Background service worker
-├── content_script.js            # 内容脚本，注入到网页，处理拖拽预览 / Content script injected into web pages, handles drag preview
-├── link_content_extractor.js    # 注入到临时标签页，使用Readability提取内容 / Injected into temp tab, uses Readability to extract content
-├── options.html                 # API密钥设置页面 / Options page for API key
-├── options.js                   # options.html 的脚本 / Script for options.html
-├── options.css                  # options.html 的样式 / Styles for options.html
-├── sidebar.html                 # 侧边栏界面文件 / Sidebar UI file
-├── sidebar.js                   # 侧边栏逻辑脚本 / Sidebar logic script
-├── sidebar.css                  # 侧边栏样式 / Sidebar styles
+g-extension/
+├── manifest.json                # 插件清单文件
+├── background.js                # 后台服务工作脚本
+├── content_script.js            # 内容脚本 (处理页面交互，如拖拽链接预览、文本选择)
+├── link_content_extractor.js    # 注入到临时标签页，使用Readability提取链接内容
+├── sidebar.html                 # 侧边栏界面
+├── sidebar.js                   # 侧边栏逻辑脚本
+├── sidebar.css                  # 侧边栏样式
+├── archive.html                 # 已存档对话查看页面
+├── archive.js                   # 已存档对话页面的逻辑脚本
+├── archive.css                  # 已存档对话页面的样式
+├── options.html                 # API密钥等设置页面
+├── options.js                   # 设置页面的逻辑脚本
+├── options.css                  # 设置页面的样式
 ├── libs/
-│   ├── Readability.js           # 用于提取网页正文的库 / Library for extracting main content from webpages
-│   └── marked.min.js            # Markdown 解析库 / Markdown parsing library
-└── images/                      # 插件图标 / Extension icons
+│   ├── Readability.js           # 用于提取网页正文的库
+│   └── marked.min.js            # Markdown 解析库
+└── images/                      # 插件图标 (icon16.png, icon48.png, icon128.png)
 ```
----
-## ⚠️ 已知问题与限制 / Known Issues & Limitations
 
-🇨🇳 **中文**:
-* **页面兼容性**: 侧边栏通过修改页面DOM结构来“推送”内容，这可能在某些结构复杂或使用特定JavaScript框架的网站上导致布局问题或功能冲突。拖拽链接预览窗口也可能在某些特殊页面无法正常显示或交互。
+
+---
+
+## ⚠️ 已知问题与限制
+
+* **页面兼容性**:
+    * 侧边栏的实现依赖于标准的浏览器功能，但在极少数结构特别复杂或使用特定JavaScript框架的网站上可能出现显示异常。
+    * 拖拽链接以激活预览窗口的功能在某些特殊页面（如iframe较多或有自定义拖拽处理的页面）可能不够灵敏或无法正常交互。
 * **API 密钥安全**: 您的 Gemini API 密钥存储在浏览器的同步存储中 (`chrome.storage.sync`)。请注意保护好您的密钥，不要在不信任的计算机上使用。密钥的安全性由用户负责。
 * **内容提取**:
-    * **当前页面总结**: 仍使用 `document.body.innerText` 提取内容，对于某些包含大量非主要内容的页面，总结效果可能受影响。
-    * **链接内容总结**: 使用 `Readability.js` 提取主要内容，通常效果较好，但仍可能在某些特殊结构的页面上提取不完整或不准确。
-* **错误处理**: 虽然进行了一些错误处理，但可能仍有未覆盖到的场景，例如链接页面加载超时或内容提取失败。
-* **拖拽体验**: 拖拽链接以激活预览窗口的功能在某些情况下可能不够灵敏或与其他拖拽操作冲突。
-
-🇬🇧 **English**:
-* **Page Compatibility**: The sidebar "pushes" content by modifying the page's DOM structure. This might cause layout issues or conflicts on some websites with complex structures or specific JavaScript frameworks. The link drag preview window might also not display or interact correctly on certain special pages.
-* **API Key Security**: Your Gemini API key is stored in the browser's sync storage (`chrome.storage.sync`). Please be mindful of your key's security and avoid using it on untrusted computers. The user is responsible for the security of their API key.
-* **Content Extraction**:
-    * **Current Page Summarization**: Still uses `document.body.innerText` for content extraction, which might affect summary quality on pages with a lot of non-main content.
-    * **Link Content Summarization**: Uses `Readability.js` to extract main content, which generally works well but might still result in incomplete or inaccurate extraction on some uniquely structured pages.
-* **Error Handling**: While some error handling is in place, there might still be uncovered scenarios, such as link page load timeouts or content extraction failures.
-* **Drag-and-Drop Experience**: The feature to activate the preview window by dragging a link might sometimes be unresponsive or conflict with other drag operations.
+    * **当前页面总结**: 仍使用 `document.body.innerText` 提取当前页面的内容，对于包含大量非主要文本（如评论、导航链接、广告脚本残留文本）的页面，总结效果可能会受到影响，可能不够精确。
+    * **链接内容总结**: 使用 `Readability.js` 提取主要内容，通常效果较好，但仍可能在某些特殊页面结构或动态加载内容非常多的网站上提取不完整或不准确。
+* **错误处理**: 虽然进行了一些错误处理，但可能仍有未覆盖到的场景，例如链接页面加载超时、网络请求失败或API返回非预期错误。
+* **长对话性能**: 非常长的对话历史可能会轻微影响侧边栏加载速度，尽管已实现分页或虚拟滚动等优化。对话历史上限当前设定为50条。
 
 ---
 
-## 展望未来 / Future Enhancements
+## 展望未来
 
-🇨🇳 **中文**:
-* **改进当前页面内容提取**: 为当前页面总结功能也集成 `Readability.js` 或类似方案，以提高内容提取质量。
-* **右键菜单总结链接**: 添加通过右键菜单直接总结链接的选项，作为拖拽方式的补充。
-* **支持在侧边栏内进行多轮对话历史的搜索。**
-* **更高级的对话分割和管理功能。**
-* **支持更多语言的总结和对话。**
-* **用户可自定义的提示词 (Prompts)。**
-* **流式输出**: 实现AI回复的流式输出，而不是等待完整回复。
-
-🇬🇧 **English**:
-* **Improve Current Page Content Extraction**: Integrate `Readability.js` or a similar solution for summarizing the current page to enhance content extraction quality.
-* **Context Menu for Link Summarization**: Add an option to summarize links via the context menu as an alternative to drag-and-drop.
-* **Support for searching within multi-turn conversation history in the sidebar.**
-* **Advanced conversation splitting and management features.**
-* **Support for summarization and chat in more languages.**
-* **User-customizable prompts.**
-* **Streaming Output**: Implement streaming for AI responses instead of waiting for the complete response.
+* **改进当前页面内容提取**: 为当前页面总结功能也集成 `Readability.js` 或类似方案，以提高内容提取质量和准确性。
+* **右键菜单快捷操作**:
+    * 增加右键选择文本后直接发送到侧边栏进行提问或处理的选项。
+    * 增加右键点击链接时，直接发送链接到侧边栏进行总结的选项。
+* **对话标题与搜索**:
+    * 允许用户为对话历史和存档条目自定义标题。
+    * 在对话历史和存档中实现关键词搜索功能。
+* **高级对话管理**:
+    * 支持在对话中编辑已发送的消息。
+    * 更灵活的对话合并或消息移动功能。
+* **多语言支持**: 增加对更多语言的界面和AI交互支持。
+* **用户自定义 Prompts**: 允许用户保存和使用自定义的提示词模板，以快速执行特定任务。
+* **AI回复流式输出**: 实现AI回复的流式（打字机效果）输出，而不是等待完整回复后再显示，以改善用户体验。
+* **更细致的错误提示与引导**: 提供更友好和具体的错误信息，并给出可能的解决方案。
+* **主题定制**: 允许用户选择不同的侧边栏主题（如暗色模式）。
 
 ---
 
-## (可选 / Optional) 许可证 / License
+## 许可证
 
-🇨🇳 **中文**:
 此项目采用 [MIT 许可证](LICENSE)。
-
-🇬🇧 **English**:
-This project is licensed under the [MIT License](LICENSE).
