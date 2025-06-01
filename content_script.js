@@ -240,7 +240,7 @@ document.addEventListener('dragstart', (event) => {
 
 document.addEventListener('dragend', () => {
     // Hide preview after a short delay to allow click on summarize button if drag ends quickly
-    setTimeout(hidePreview, 100);
+    setTimeout(hidePreview, 1000);
 }, true);
 
 
