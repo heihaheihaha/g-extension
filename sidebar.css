@@ -148,7 +148,7 @@ body {
 .message.user {
   background-color: var(--user-message-bg);
   color: var(--user-message-text);
-  margin-right: 20%; 
+  margin-right: 20%;
 }
 
 .message.ai {
@@ -157,7 +157,7 @@ body {
 }
 
 .message-content-wrapper {
-  padding-bottom: 5px; 
+  padding-bottom: 5px;
 }
 .message-content-wrapper p:last-child {
   margin-bottom: 0;
@@ -207,7 +207,7 @@ body {
 
 .archive-icon {
   color: var(--primary-button-bg);
-  font-family: 'Courier New', Courier, monospace; 
+  font-family: 'Courier New', Courier, monospace;
   font-weight: bold;
 }
 .archive-icon:hover {
@@ -215,19 +215,19 @@ body {
 }
 
 .archived-text {
-  color: #28a745; 
+  color: #28a745;
   font-style: italic;
   cursor: default;
 }
 
 #selectedTextPreview {
   font-size: 0.9em;
-  background-color: #fff3cd; 
+  background-color: #fff3cd;
   color: #856404;
   padding: 8px 12px;
   border: 1px solid #ffeeba;
   border-radius: var(--border-radius);
-  display: flex; 
+  display: flex;
   justify-content: space-between;
   align-items: center;
 }
@@ -242,7 +242,7 @@ body {
   background: none;
   border: none;
   color: #856404;
-  font-size: 1em; 
+  font-size: 1em;
   padding: 2px 5px;
   cursor: pointer;
   border-radius: 3px;
@@ -252,16 +252,16 @@ body {
 }
 
 #chatInput {
-  width: 100%; 
+  width: 100%;
   min-height: 70px;
   padding: 10px;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  box-sizing: border-box; 
+  box-sizing: border-box;
   font-family: inherit;
   font-size: 1em;
   line-height: 1.5;
-  resize: vertical; 
+  resize: vertical;
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 #chatInput:focus {
@@ -292,64 +292,92 @@ body {
 
 .history-panel {
   border-top: 1px solid var(--border-color);
-  padding-top: 12px;
-  max-height: 30%; 
-  overflow-y: auto;
+  padding-top: 8px; /* Reduced padding as list is gone */
+  /* max-height: 30%; */ /* Not strictly needed for just a button area */
+  /* overflow-y: auto; */ /* Not needed if content doesn't overflow */
   display: flex;
   flex-direction: column;
   gap: 8px;
   background-color: #ffffff;
-  padding: 10px;
+  padding: 10px; /* Keep some padding for the panel itself */
   border-radius: var(--border-radius);
-  box-shadow: 0 -1px 5px rgba(0,0,0,0.03); 
+  box-shadow: 0 -1px 5px rgba(0,0,0,0.03);
 }
 
-.history-panel h3 {
-  margin-top: 0;
-  margin-bottom: 8px;
-  font-size: 1.1em;
-  font-weight: 600;
-  color: var(--primary-text-color);
+.history-actions-details {
+  width: 100%;
 }
+
+.history-actions-summary {
+  padding: 6px 10px;
+  cursor: pointer;
+  background-color: var(--hover-bg-color);
+  border-radius: var(--border-radius);
+  font-size: 0.9em;
+  color: var(--secondary-text-color);
+  text-align: center;
+  list-style: none; /* Remove default marker */
+  transition: background-color 0.15s ease-in-out;
+}
+.history-actions-summary::-webkit-details-marker { /* For Chrome/Safari */
+  display: none;
+}
+.history-actions-summary::marker { /* For Firefox */
+ content: "";
+}
+
+
+.history-actions-summary:hover {
+  background-color: var(--active-bg-color);
+}
+
+.history-actions-details[open] .history-actions-summary {
+  margin-bottom: 8px; /* Add some space when open */
+}
+
 
 #chatHistoryList {
-  overflow-y: auto; 
-  flex-grow: 1; 
+  /* This div is now removed from HTML, styles can be removed or commented out */
+  /* overflow-y: auto; */
+  /* flex-grow: 1; */
 }
 
 .history-item {
-  padding: 10px 12px;
+  /* This class is no longer used, styles can be removed or commented out */
+  /* padding: 10px 12px;
   border-bottom: 1px solid var(--border-color);
   cursor: pointer;
   display: flex;
   justify-content: space-between;
   align-items: center;
   transition: background-color 0.15s ease-in-out;
-  border-radius: 4px; 
+  border-radius: 4px; */
 }
-.history-item:last-child {
+/* .history-item:last-child {
   border-bottom: none;
 }
 .history-item:hover {
   background-color: var(--hover-bg-color);
-}
+} */
 
 .history-item-title {
-  flex-grow: 1;
+   /* This class is no longer used, styles can be removed or commented out */
+  /* flex-grow: 1;
   margin-right: 10px;
   font-size: 0.9em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--secondary-text-color);
+  color: var(--secondary-text-color); */
 }
-.history-item:hover .history-item-title {
+/* .history-item:hover .history-item-title {
     color: var(--primary-text-color);
-}
+} */
 
 
 .history-item-buttons button {
-  margin-left: 5px;
+   /* This class is no longer used, styles can be removed or commented out */
+  /* margin-left: 5px;
   padding: 4px 8px;
   font-size: 0.8em;
   cursor: pointer;
@@ -357,9 +385,9 @@ body {
   background-color: #fff;
   border-radius: var(--border-radius);
   transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
-  color: var(--secondary-text-color);
+  color: var(--secondary-text-color); */
 }
-.history-item-buttons button.archive-btn:hover {
+/* .history-item-buttons button.archive-btn:hover {
   background-color: #e6f7ff;
   border-color: #91d5ff;
   color: #0056b3;
@@ -368,13 +396,13 @@ body {
   background-color: #fff5f5;
   border-color: #ffccc7;
   color: #dc3545;
-}
+} */
 
 
 #clearAllHistoryButton {
   display: block;
-  width: 100%; 
-  margin-top: 8px; 
+  width: 100%;
+  /* margin-top: 8px; */ /* Now controlled by details[open] summary margin */
   padding: 9px 12px;
   background-color: var(--destructive-button-bg);
   color: var(--destructive-button-text);
@@ -391,7 +419,7 @@ body {
 .temporary-status {
   font-style: italic;
   color: var(--light-text-color);
-  background-color: var(--sidebar-bg-color); 
+  background-color: var(--sidebar-bg-color);
   padding: 8px 10px;
   text-align: center;
   border: 1px dashed var(--border-color);
@@ -400,14 +428,14 @@ body {
 /* Scrollbar styling (optional, browser-specific) */
 #chatOutput::-webkit-scrollbar,
 .history-panel::-webkit-scrollbar,
-#chatHistoryList::-webkit-scrollbar {
+#chatHistoryList::-webkit-scrollbar { /* chatHistoryList might no longer scroll, but keep for .history-panel if it might grow */
   width: 8px;
 }
 
 #chatOutput::-webkit-scrollbar-track,
 .history-panel::-webkit-scrollbar-track,
 #chatHistoryList::-webkit-scrollbar-track {
-  background: transparent; 
+  background: transparent;
 }
 
 #chatOutput::-webkit-scrollbar-thumb,
@@ -415,7 +443,7 @@ body {
 #chatHistoryList::-webkit-scrollbar-thumb {
   background-color: var(--border-color);
   border-radius: 10px;
-  border: 2px solid transparent; 
+  border: 2px solid transparent;
   background-clip: content-box;
 }
 

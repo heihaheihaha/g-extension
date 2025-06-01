@@ -11,7 +11,8 @@
       <button id="summarizePageButton">总结当前网页 (中文)</button>
       <button id="splitChatButton">分割当前对话</button>
       <button id="viewArchivedChatsButton">查看已存档对话</button>
-      <button id="managePromptsButton">管理 Prompt</button> </div>
+      <button id="managePromptsButton">管理 Prompt</button>
+    </div>
 
     <div class="prompt-shortcuts-container">
       <h4>Prompt 快捷方式:</h4>
@@ -22,6 +23,11 @@
     <div class="chat-area">
       <div id="chatOutput">
         </div>
+
+      <div id="selectedImagePreviewContainer" style="display:none; margin-bottom: 5px; text-align: center;">
+        </div>
+      <button id="clearSelectedImageButton" style="display: none; margin: 0 auto 8px auto; font-size: 0.8em; padding: 3px 8px; display:block; width: fit-content; background-color: var(--control-button-bg); color: var(--control-button-text); border: none; border-radius: var(--border-radius); cursor:pointer;">清除图片</button>
+
       <div id="selectedTextPreview" style="display:none; font-style: italic; color: gray; padding: 5px; border: 1px dashed #ccc; margin-bottom: 5px;">
         引用内容: <span id="selectedTextContent"></span>
         <button id="clearSelectedTextButton" style="margin-left: 5px; font-size: 0.8em;">清除</button>
@@ -30,10 +36,10 @@
       <button id="sendMessageButton">发送</button>
     </div>
     <div class="history-panel">
-      <h3>对话历史</h3>
-      <div id="chatHistoryList">
-        </div>
-      <button id="clearAllHistoryButton">清除所有历史</button>
+      <details class="history-actions-details">
+        <summary class="history-actions-summary">更多历史操作</summary>
+        <button id="clearAllHistoryButton">清除所有历史</button>
+      </details>
     </div>
   </div>
   <script src="/libs/marked.min.js"></script>

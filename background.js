@@ -15,12 +15,38 @@ async function loadApiKey() {
   }
 }
 
+// Create context menu item
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "analyzeImageWithGemini",
+    title: "用 Gemini 分析图片",
+    contexts: ["image"]
+  });
+  console.log("Background: Context menu for image analysis created.");
+});
+
+// Listener for context menu clicks
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "analyzeImageWithGemini" && info.srcUrl) {
+    chrome.runtime.sendMessage({
+      type: "IMAGE_SELECTED_FOR_SIDEBAR",
+      imageUrl: info.srcUrl
+    }, response => {
+      if (chrome.runtime.lastError) {
+        console.log("Background: Error sending image to sidebar, perhaps sidebar is not open or responding.", chrome.runtime.lastError.message);
+      } else {
+        // console.log("Background: Image URL sent to sidebar.", response);
+      }
+    });
+  }
+});
+
+
 (async () => {
   await loadApiKey();
   try {
     await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-  } catch (error)
- {
+  } catch (error) {
     console.error("Background: Failed to set side panel behavior:", error);
   }
 })();
@@ -54,13 +80,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true;
   } else if (request.action === "TEXT_SELECTED_FROM_PAGE") {
+    // Forward message to sidebar (if open)
     chrome.runtime.sendMessage({ type: "TEXT_SELECTED_FOR_SIDEBAR", text: request.text });
-    sendResponse({ status: "Text selected event forwarded to sidebar" });
+    sendResponse({ status: "Text selected event forwarded" }); // Removed "to sidebar" as it's a general broadcast
     return true;
   } else if (request.action === "summarizeLinkTarget") {
     const linkUrl = request.url;
     const linkText = request.linkText || linkUrl; // Use link text if provided
-    console.log("Background: Received summarizeLinkTarget for:", linkUrl, "Link Text:", linkText);
+    // console.log("Background: Received summarizeLinkTarget for:", linkUrl, "Link Text:", linkText);
     sendResponse({ status: "Processing link summarization..." });
 
     chrome.runtime.sendMessage({ type: "LINK_SUMMARIZATION_STARTED", url: linkUrl, title: linkText });
@@ -93,18 +120,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       chrome.tabs.onUpdated.addListener(tabUpdateListener);
       // Timeout for tab loading, in case 'complete' never fires for some pages
       setTimeout(() => {
-          chrome.tabs.get(tempTabId, (tabDetails) => {
-              if (tabDetails && !tabDetails.status.includes('complete')) { // If tab still exists and isn't complete
-                  chrome.tabs.onUpdated.removeListener(tabUpdateListener);
-                  console.warn(`Background: Timeout waiting for tab ${tempTabId} to load complete for ${linkUrl}. Attempting injection anyway or closing.`);
-                  // Option 1: Try to inject anyway (might fail if DOM not ready)
-                  // Option 2: Send error and close
-                  chrome.runtime.sendMessage({ type: "SHOW_LINK_SUMMARY_ERROR", message: "页面加载超时，无法提取内容。", url: linkUrl, title: linkText });
-                  chrome.tabs.remove(tempTabId).catch(e => console.warn("BG: Failed to remove temp tab post-timeout", e));
-              }
-          });
+        chrome.tabs.get(tempTabId, (tabDetails) => {
+          if (tabDetails && tabDetails.status && !tabDetails.status.includes('complete')) { // If tab still exists and isn't complete
+            chrome.tabs.onUpdated.removeListener(tabUpdateListener);
+            console.warn(`Background: Timeout waiting for tab ${tempTabId} to load complete for ${linkUrl}. Attempting injection anyway or closing.`);
+            chrome.runtime.sendMessage({ type: "SHOW_LINK_SUMMARY_ERROR", message: "页面加载超时，无法提取内容。", url: linkUrl, title: linkText });
+            chrome.tabs.remove(tempTabId).catch(e => console.warn("BG: Failed to remove temp tab post-timeout", e));
+          } else if (!tabDetails) { // Tab was closed or crashed before timeout
+            chrome.tabs.onUpdated.removeListener(tabUpdateListener);
+            console.warn(`Background: Tab ${tempTabId} for ${linkUrl} was closed or crashed before loading.`);
+            // Error message might have already been sent by other handlers if it was a crash.
+          }
+        });
       }, 20000); // 20 seconds timeout
-
     });
     return true;
   } else if (request.action === "extractedLinkContent") {
@@ -112,11 +140,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const tempTabId = sender.tab?.id;
 
     if (tempTabId) {
-      chrome.tabs.remove(tempTabId).catch(e => console.warn("BG: Failed to remove temp tab", e));
+      chrome.tabs.remove(tempTabId).catch(e => console.warn("BG: Failed to remove temp tab", tempTabId, e));
     }
 
     if (error) {
-      chrome.runtime.sendMessage({ type: "SHOW_LINK_SUMMARY_ERROR", message: error, url: originalUrlFromExtractor, title: extractedTitle });
+      chrome.runtime.sendMessage({ type: "SHOW_LINK_SUMMARY_ERROR", message: error, url: originalUrlFromExtractor, title: extractedTitle || originalUrlFromExtractor });
     } else {
       chrome.runtime.sendMessage({
         type: "SUMMARIZE_EXTERNAL_TEXT_FOR_SIDEBAR",
@@ -130,7 +158,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  return false;
+  return false; // Return false for synchronous onMessage listeners or if not handled.
 });
 
 console.log("Background script (gemini-sidebar with sidePanel) started.");

@@ -6,15 +6,16 @@ let currentChat = [];
 let allChats = [];
 let archivedChats = [];
 let currentSelectedText = null;
-let promptTemplates = []; // New: For storing prompt templates
+let currentSelectedImageUrl = null; // New: For selected image URL
+let promptTemplates = [];
 
 // --- DOM 元素获取 ---
 let chatOutput, chatInput, sendMessageButton, summarizePageButton,
     selectedTextPreview, selectedTextContent, clearSelectedTextButton,
+    selectedImagePreviewContainer, clearSelectedImageButton, // New: For image preview
     historyPanel, chatHistoryList, clearAllHistoryButton,
     splitChatButton, viewArchivedChatsButton,
-    managePromptsButton, // New
-    promptShortcutsContainer; // New
+    managePromptsButton, promptShortcutsContainer;
 
 
 // --- 初始化和API Key加载 ---
@@ -26,13 +27,15 @@ async function initialize() {
     selectedTextPreview = document.getElementById('selectedTextPreview');
     selectedTextContent = document.getElementById('selectedTextContent');
     clearSelectedTextButton = document.getElementById('clearSelectedTextButton');
+    selectedImagePreviewContainer = document.getElementById('selectedImagePreviewContainer'); // New
+    clearSelectedImageButton = document.getElementById('clearSelectedImageButton'); // New
     historyPanel = document.querySelector('.history-panel');
-    chatHistoryList = document.getElementById('chatHistoryList');
+    // chatHistoryList = document.getElementById('chatHistoryList'); // This was removed from HTML
     clearAllHistoryButton = document.getElementById('clearAllHistoryButton');
     splitChatButton = document.getElementById('splitChatButton');
     viewArchivedChatsButton = document.getElementById('viewArchivedChatsButton');
-    managePromptsButton = document.getElementById('managePromptsButton'); // New
-    promptShortcutsContainer = document.getElementById('promptShortcuts'); // New
+    managePromptsButton = document.getElementById('managePromptsButton');
+    promptShortcutsContainer = document.getElementById('promptShortcuts');
 
 
     if (typeof marked !== 'object' || marked === null || typeof marked.parse !== 'function') {
@@ -53,9 +56,9 @@ async function initialize() {
         disableInputs();
     }
 
-    await loadArchivedChats(); 
-    loadChatHistory(); 
-    await loadPromptTemplates(); // New: Load prompts
+    await loadArchivedChats();
+    loadChatHistory();
+    await loadPromptTemplates();
 
     if (!currentChat || currentChat.length === 0 && allChats.length === 0) {
         renderCurrentChat();
@@ -74,13 +77,16 @@ async function initialize() {
 
     if (summarizePageButton) summarizePageButton.addEventListener('click', handleSummarizeCurrentPage);
     if (clearSelectedTextButton) clearSelectedTextButton.addEventListener('click', clearSelectedTextPreview);
+    if (clearSelectedImageButton) clearSelectedImageButton.addEventListener('click', clearSelectedImagePreview); // New
+
+
     if (clearAllHistoryButton) {
         clearAllHistoryButton.addEventListener('click', () => {
             if (confirm("确定要清除所有对话历史吗？此操作无法撤销。")) {
                 allChats = [];
                 currentChat = [];
                 saveChatHistory();
-                renderChatHistoryList();
+                renderChatHistoryList(); // This function might need adjustment if chatHistoryList element is gone
                 renderCurrentChat();
                 addMessageToChat({ role: 'model', parts: [{text: '所有对话历史已清除。'}], timestamp: Date.now() });
             }
@@ -93,7 +99,6 @@ async function initialize() {
             chrome.tabs.create({ url: chrome.runtime.getURL('archive.html') });
         });
     }
-    // New: Event listener for Manage Prompts button
     if (managePromptsButton) {
         managePromptsButton.addEventListener('click', () => {
             chrome.tabs.create({ url: chrome.runtime.getURL('prompts.html') });
@@ -101,7 +106,7 @@ async function initialize() {
     }
 
 
-    chrome.storage.onChanged.addListener(async (changes, namespace) => { // Added async here
+    chrome.storage.onChanged.addListener(async (changes, namespace) => {
         if (namespace === 'sync' && changes.geminiApiKey) {
             geminiApiKey = changes.geminiApiKey.newValue;
             addMessageToChat({ role: 'model', parts: [{text: 'API 密钥已更新。'}], timestamp: Date.now() });
@@ -116,7 +121,6 @@ async function initialize() {
                 archivedChats = changes.geminiArchivedChats.newValue || [];
                 updateArchivedChatsButtonCount();
             }
-            // New: Listen for prompt template changes
             if (changes.promptTemplates) {
                 await loadPromptTemplates();
             }
@@ -125,7 +129,6 @@ async function initialize() {
     chrome.runtime.onMessage.addListener(handleRuntimeMessages);
 }
 
-// New: Function to load prompt templates
 async function loadPromptTemplates() {
     const result = await chrome.storage.local.get(['promptTemplates']);
     const presets = [
@@ -135,27 +138,25 @@ async function loadPromptTemplates() {
 
     if (result.promptTemplates && result.promptTemplates.length > 0) {
         promptTemplates = result.promptTemplates;
-        // Ensure presets are always up-to-date or added if missing
         presets.forEach(preset => {
             const existing = promptTemplates.find(p => p.id === preset.id);
             if (!existing) {
                 promptTemplates.unshift(preset);
-            } else if (existing.isPreset) { // Update existing preset's content/name if needed
+            } else if (existing.isPreset) {
                 existing.name = preset.name;
                 existing.content = preset.content;
             }
         });
     } else {
         promptTemplates = [...presets];
-        await chrome.storage.local.set({ promptTemplates: promptTemplates }); // Save presets if first time
+        await chrome.storage.local.set({ promptTemplates: promptTemplates });
     }
     renderPromptShortcuts();
 }
 
-// New: Function to render prompt shortcut buttons
 function renderPromptShortcuts() {
     if (!promptShortcutsContainer) return;
-    promptShortcutsContainer.innerHTML = ''; // Clear existing shortcuts
+    promptShortcutsContainer.innerHTML = '';
 
     promptTemplates.forEach(template => {
         const button = document.createElement('button');
@@ -167,17 +168,39 @@ function renderPromptShortcuts() {
     });
 }
 
-// New: Function to apply a prompt template
 function applyPromptTemplate(template) {
     let content = template.content;
-    if (currentSelectedText) {
+    if (currentSelectedText && content.includes("{{text}}")) {
         content = content.replace(/{{text}}/g, currentSelectedText);
+    } else if (!content.includes("{{text}}") && currentSelectedText){
+        // If template doesn't use {{text}} but text is selected, perhaps user wants to ask about selected text using the template as a base query
+        // For now, we just populate the template as is. User can manually add {{text}} or clear selected text.
     }
     chatInput.value = content;
     chatInput.focus();
-    // Optionally, auto-send if {{text}} was the only thing and it got replaced?
-    // For now, just populate and let user send.
 }
+
+// --- New Image Preview Functions ---
+function displaySelectedImagePreview(imageUrl) {
+    if (selectedImagePreviewContainer && imageUrl) {
+        selectedImagePreviewContainer.innerHTML = `<img src="${imageUrl}" alt="Selected image preview" style="max-width: 100%; max-height: 150px; object-fit: contain; border: 1px solid var(--border-color); border-radius: var(--border-radius);">`;
+        selectedImagePreviewContainer.style.display = 'block';
+        if (clearSelectedImageButton) clearSelectedImageButton.style.display = 'block'; // Show clear button
+        chatInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+        clearSelectedImagePreview();
+    }
+}
+
+function clearSelectedImagePreview() {
+    currentSelectedImageUrl = null;
+    if (selectedImagePreviewContainer) {
+        selectedImagePreviewContainer.innerHTML = '';
+        selectedImagePreviewContainer.style.display = 'none';
+    }
+    if (clearSelectedImageButton) clearSelectedImageButton.style.display = 'none';
+}
+// --- End New Image Preview Functions ---
 
 
 function updateArchivedChatsButtonCount() {
@@ -188,9 +211,9 @@ function updateArchivedChatsButtonCount() {
 
 function handleSplitChat() {
     const chatToProcess = currentChat.filter(msg => !(msg.isThinking || msg.isTempStatus));
-    
+
     if (chatToProcess.length > 0) {
-        archivedChats.unshift([...chatToProcess].map(m => ({...m, archived: undefined }))); 
+        archivedChats.unshift([...chatToProcess].map(m => ({...m, archived: undefined })));
         saveArchivedChats();
 
         let alreadyInAllChats = false;
@@ -200,7 +223,7 @@ function handleSplitChat() {
         if (!alreadyInAllChats) {
             allChats.unshift([...chatToProcess]);
             if (allChats.length > 50) allChats.pop();
-            saveChatHistory(); 
+            saveChatHistory();
             renderChatHistoryList();
         }
     }
@@ -213,7 +236,7 @@ function handleSplitChat() {
 
 function archiveQaPair(aiMessageIndexInCurrentChat) {
     const aiMessage = currentChat[aiMessageIndexInCurrentChat];
-    if (!aiMessage || aiMessage.archived) return; 
+    if (!aiMessage || aiMessage.archived) return;
 
     let userMessage = null;
     for (let i = aiMessageIndexInCurrentChat - 1; i >= 0; i--) {
@@ -226,18 +249,17 @@ function archiveQaPair(aiMessageIndexInCurrentChat) {
     if (userMessage && aiMessage) {
         const userMessageCopy = JSON.parse(JSON.stringify(userMessage));
         const aiMessageCopy = JSON.parse(JSON.stringify(aiMessage));
-        delete userMessageCopy.archived; 
+        delete userMessageCopy.archived;
         delete aiMessageCopy.archived;
 
         const qaPairToArchive = [userMessageCopy, aiMessageCopy];
-        
+
         archivedChats.unshift(qaPairToArchive);
         saveArchivedChats();
 
-        aiMessage.archived = true; 
-        
-        renderCurrentChat(); 
-        saveCurrentChat(); 
+        aiMessage.archived = true;
+        renderCurrentChat();
+        saveCurrentChat();
 
         const tempStatusMsg = addMessageToChat({role: 'model', parts: [{text: '该问答已存档。'}], timestamp: Date.now(), isTempStatus: true});
         setTimeout(() => {
@@ -267,8 +289,12 @@ function handleRuntimeMessages(request, sender, sendResponse) {
     if (request.type === 'TEXT_SELECTED_FOR_SIDEBAR') {
         currentSelectedText = request.text;
         if (selectedTextContent) selectedTextContent.textContent = currentSelectedText.length > 100 ? currentSelectedText.substring(0, 97) + '...' : currentSelectedText;
-        if (selectedTextPreview) selectedTextPreview.style.display = 'block';
+        if (selectedTextPreview) selectedTextPreview.style.display = 'flex';
         sendResponse({status: "Selected text received in sidebar"});
+    } else if (request.type === 'IMAGE_SELECTED_FOR_SIDEBAR') { // New: Handle image selection
+        currentSelectedImageUrl = request.imageUrl;
+        displaySelectedImagePreview(currentSelectedImageUrl);
+        sendResponse({status: "Image URL received in sidebar"});
     } else if (request.type === 'SUMMARIZE_EXTERNAL_TEXT_FOR_SIDEBAR') {
         const { text, linkUrl, linkTitle, warning } = request;
         removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.includes("正在总结链接"));
@@ -293,7 +319,7 @@ function handleRuntimeMessages(request, sender, sendResponse) {
 
     } else if (request.type === 'LINK_SUMMARIZATION_STARTED') {
         const { url, title } = request;
-        removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.includes("正在总结链接"));
+        removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.includes("正在总结链接")); // remove any previous
         addMessageToChat({ role: 'model', parts: [{text: `正在总结链接: [${title || url}](${url})... 请稍候。`}], timestamp: Date.now(), isTempStatus: true });
         sendResponse({status: "Notified user"});
 
@@ -301,7 +327,7 @@ function handleRuntimeMessages(request, sender, sendResponse) {
         handleSummarizeCurrentPage();
         sendResponse({ status: "Sidebar initiated page summary." });
     }
-    return true;
+    return true; // Keep true for async sendResponse
 }
 
 function removeMessageByContentCheck(conditionFn) {
@@ -318,9 +344,22 @@ function removeMessageByContentCheck(conditionFn) {
 
 async function handleSendMessage() {
     const messageText = chatInput.value.trim();
-    if (!messageText && !currentSelectedText) { // Modified condition slightly, though `messageText` alone was main check
-        addMessageToChat({ role: 'model', parts: [{text: '请输入消息或选择页面文本后再发送。'}], timestamp: Date.now(), isTempStatus: true });
-        setTimeout(() => removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.startsWith('请输入消息')), 3000);
+    let userMessageForApi = messageText;
+    let displayUserMessageInChat = messageText;
+
+    if (currentSelectedText && messageText.includes("{{text}}")) {
+        userMessageForApi = messageText.replace(/{{text}}/g, currentSelectedText);
+        displayUserMessageInChat = userMessageForApi;
+    } else if (currentSelectedText && !messageText.includes("{{text}}") && messageText) {
+        userMessageForApi = `关于以下引用内容：\n"${currentSelectedText}"\n\n我的问题/指令是：\n"${messageText}"`;
+        displayUserMessageInChat = `(引用内容: ${currentSelectedText.substring(0,50)}...) ${messageText}`;
+    }
+
+    const imageUrlToSend = currentSelectedImageUrl;
+
+    if (!userMessageForApi.trim() && !imageUrlToSend) {
+        const tempMsg = addMessageToChat({ role: 'model', parts: [{text: '请输入消息或选择图片/文本后再发送。'}], timestamp: Date.now(), isTempStatus: true });
+        setTimeout(() => removeMessageByContentCheck(msg => msg.timestamp === tempMsg.timestamp && msg.isTempStatus), 3000);
         return;
     }
     if (!geminiApiKey) {
@@ -329,54 +368,32 @@ async function handleSendMessage() {
         return;
     }
 
-    let userMessageContent = messageText;
-    // Display message logic for chat history if selected text was part of input (via template or manual)
-    // For now, the display message will be what's in the chatInput.
-    // If a template was used and {{text}} was replaced, that's already in messageText.
-    // If user manually typed after using a template that still has {{text}}, it will be sent as is.
+    let finalDisplayMessage = displayUserMessageInChat;
+    let finalApiTextMessage = userMessageForApi;
 
-    // If `currentSelectedText` exists AND `messageText` (from chatInput) explicitly contains `{{text}}`,
-    // it implies the user might be using a template and wants the selected text injected there.
-    // However, the `applyPromptTemplate` already handles this if a shortcut was clicked.
-    // This direct send primarily handles manually typed messages or messages where template was manually edited.
-    
-    let displayMessage = messageText; // This will be what's shown in the chat.
+    if (imageUrlToSend) {
+        if (!finalDisplayMessage.trim()) {
+            finalDisplayMessage = "(图片已选择)"; // User sees this if they only sent an image
+            finalApiTextMessage = "请描述这张图片。"; // API gets this if user typed nothing
+        } else {
+            finalDisplayMessage += " (附带图片)";
+        }
+    }
 
-    if (currentSelectedText && messageText.includes("{{text}}")) {
-         // If user manually typed or edited a template that still has {{text}}
-         // and there IS selected text, replace it for the API call.
-        userMessageContent = messageText.replace(/{{text}}/g, currentSelectedText);
-        // For display, we could show a note or just the processed text.
-        // Let's keep displayMessage as what the user typed, and userMessageContent for API.
-        // OR, be consistent with template application:
-        // displayMessage = userMessageContent; // This would show the replaced text in the chat log for the user.
-                                            // Let's choose this for consistency: what's sent to API is what user sees as their message.
-    } else if (currentSelectedText && !messageText.includes("{{text}}") && messageText) {
-        // If there's selected text, and user typed something *without* {{text}}
-        // assume they want to ask about the selected text.
-        // This is the original behavior for selected text.
-        userMessageContent = `关于以下引用内容：\n"${currentSelectedText}"\n\n我的问题/指令是：\n"${messageText}"`;
-        displayMessage = `(引用内容: ${currentSelectedText.substring(0,50)}...) ${messageText}`;
-    } else {
-        // No selected text, or selected text but user didn't use {{text}} and didn't type a separate question
-        // (e.g. chatInput was populated by a template that didn't need currentSelectedText or it was cleared).
-        userMessageContent = messageText;
-        displayMessage = messageText;
+    if (!finalApiTextMessage.trim() && !imageUrlToSend) { // Double check after all processing
+         const tempMsg = addMessageToChat({ role: 'model', parts: [{text: '没有有效内容发送。'}], timestamp: Date.now(), isTempStatus: true });
+         setTimeout(() => removeMessageByContentCheck(msg => msg.timestamp === tempMsg.timestamp && msg.isTempStatus), 3000);
+         return;
     }
 
 
-    if (!userMessageContent.trim()) { // After potential {{text}} replacement, if it's empty
-        addMessageToChat({ role: 'model', parts: [{text: '请输入有效消息。'}], timestamp: Date.now(), isTempStatus: true });
-        setTimeout(() => removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.startsWith('请输入有效消息')), 3000);
-        return;
-    }
-
-    addMessageToChat({ role: 'user', parts: [{text: displayMessage}], timestamp: Date.now() });
+    addMessageToChat({ role: 'user', parts: [{text: finalDisplayMessage}], timestamp: Date.now() });
 
     chatInput.value = '';
-    clearSelectedTextPreview(); // Clear selected text quote after sending
+    clearSelectedTextPreview();
+    clearSelectedImagePreview(); // Clear image after adding user message to chat and before API call
 
-    await callGeminiAPI([{ text: userMessageContent }]);
+    await callGeminiAPI([{ text: finalApiTextMessage }], false, imageUrlToSend);
 }
 
 function handleSummarizeCurrentPage() {
@@ -405,7 +422,7 @@ function handleSummarizeCurrentPage() {
             }
             const prompt = `请使用中文，清晰、简洁且全面地总结以下网页内容。如果内容包含技术信息或代码，请解释其核心概念和用途。如果是一篇文章，请提炼主要观点和论据。总结应易于理解，并抓住内容的精髓。\n\n网页内容如下：\n"${pageContent}"`;
             addMessageToChat({role: 'user', parts: [{text: `总结请求：当前页面 (内容长度: ${pageContent.length})`}], timestamp: Date.now()});
-            await callGeminiAPI([{ text: prompt }], true);
+            await callGeminiAPI([{ text: prompt }], true, null); // Ensure imageUrl is null for page summary
         } else if (response && response.error) {
             addMessageToChat({role: 'user', parts: [{text: `总结请求：当前页面`}], timestamp: Date.now()});
             addMessageToChat({role: 'model', parts: [{text: `总结错误: ${response.error}`}], timestamp: Date.now() });
@@ -422,7 +439,7 @@ function disableInputs() {
     if (sendMessageButton) sendMessageButton.disabled = true;
     if (summarizePageButton) summarizePageButton.disabled = true;
     if (splitChatButton) splitChatButton.disabled = true;
-    if (managePromptsButton) managePromptsButton.disabled = true; // Disable if API key missing
+    if (managePromptsButton) managePromptsButton.disabled = true;
 }
 
 function enableInputs() {
@@ -433,7 +450,7 @@ function enableInputs() {
     if (managePromptsButton) managePromptsButton.disabled = false;
 }
 
-async function callGeminiAPI(parts, isSummary = false) {
+async function callGeminiAPI(userTextParts, isSummary = false, imageUrl = null) {
     if (!geminiApiKey) {
         addMessageToChat({ role: 'model', parts: [{text: '错误：Gemini API 密钥未配置。'}], timestamp: Date.now() });
         return;
@@ -442,18 +459,72 @@ async function callGeminiAPI(parts, isSummary = false) {
     const thinkingMessage = addMessageToChat({ role: 'model', parts: [{text: '正在思考中...'}], timestamp: Date.now(), isThinking: true });
 
     const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`;
-    
+
     const historyForAPI = currentChat
-        .filter(msg => msg.timestamp < thinkingMessage.timestamp && !msg.isTempStatus && !msg.isThinking)
+        .filter(msg => msg.timestamp < thinkingMessage.timestamp && !msg.isTempStatus && !msg.isThinking && !msg.archived)
         .map(msg => ({
             role: msg.role,
-            parts: msg.parts.map(part => ({ text: part.text }))
+            parts: msg.parts.map(part => ({ text: part.text })) // Assuming history parts are text
         }));
+
+    const currentUserMessageParts = [];
+
+    // Add text part if provided and not empty
+    if (userTextParts && userTextParts.length > 0 && userTextParts[0].text && userTextParts[0].text.trim() !== "") {
+        currentUserMessageParts.push({ text: userTextParts[0].text });
+    }
+
+    let tempImageStatusMsg = null;
+    if (imageUrl) {
+        try {
+            tempImageStatusMsg = addMessageToChat({ role: 'model', parts: [{text: '正在加载并处理图片...'}], timestamp: Date.now(), isTempStatus: true });
+            const response = await fetch(imageUrl);
+            if (!response.ok) {
+                 throw new Error(`图片获取失败: ${response.status} ${response.statusText}`);
+            }
+            const blob = await response.blob();
+            const mimeType = blob.type || 'application/octet-stream'; // Fallback MIME type
+
+            if (!mimeType.startsWith('image/')) {
+                throw new Error(`提供的URL不是有效的图片类型 (MIME: ${mimeType})。请选择图片文件。`);
+            }
+
+            const base64Data = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = (error) => reject(new Error("图片读取失败: " + error.message));
+                reader.readAsDataURL(blob);
+            });
+            currentUserMessageParts.push({
+                inlineData: {
+                    mimeType: mimeType,
+                    data: base64Data
+                }
+            });
+            if (tempImageStatusMsg) removeMessageByContentCheck(msg => msg.timestamp === tempImageStatusMsg.timestamp && msg.isTempStatus);
+        } catch (error) {
+            console.error('Error fetching or processing image:', error);
+            if (tempImageStatusMsg) removeMessageByContentCheck(msg => msg.timestamp === tempImageStatusMsg.timestamp && msg.isTempStatus);
+            removeMessageByContentCheck(msg => msg.isThinking && msg.timestamp === thinkingMessage.timestamp);
+            addMessageToChat({ role: 'model', parts: [{text: `图片处理错误: ${error.message}`}], timestamp: Date.now() });
+            return;
+        }
+    }
+
+    if (currentUserMessageParts.length === 0) {
+        removeMessageByContentCheck(msg => msg.isThinking && msg.timestamp === thinkingMessage.timestamp);
+        addMessageToChat({ role: 'model', parts: [{text: '没有内容可以发送给AI。'}], timestamp: Date.now() });
+        return;
+    }
     
-    const requestContents = [...historyForAPI, { role: "user", parts: parts }];
+    const requestContents = [...historyForAPI, { role: "user", parts: currentUserMessageParts }];
 
     const requestBody = {
         contents: requestContents,
+        // generationConfig: { // Optional: Add configuration if needed
+        //   temperature: 0.7,
+        //   topK: 40,
+        // }
     };
 
     try {
@@ -466,9 +537,13 @@ async function callGeminiAPI(parts, isSummary = false) {
         removeMessageByContentCheck(msg => msg.isThinking && msg.timestamp === thinkingMessage.timestamp);
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: { message: `HTTP error! status: ${response.status}` } }));
+            const errorData = await response.json().catch(() => ({ error: { message: `HTTP 错误 ${response.status}: ${response.statusText}` } }));
             console.error('Gemini API Error:', errorData);
-            addMessageToChat({ role: 'model', parts: [{text: `API 调用失败: ${errorData.error?.message || response.statusText}`}], timestamp: Date.now() });
+            let detailedErrorMessage = `API 调用失败: ${errorData.error?.message || response.statusText}`;
+            if (errorData.error?.details) {
+                detailedErrorMessage += ` 详情: ${JSON.stringify(errorData.error.details)}`;
+            }
+            addMessageToChat({ role: 'model', parts: [{text: detailedErrorMessage}], timestamp: Date.now() });
             return;
         }
 
@@ -480,7 +555,8 @@ async function callGeminiAPI(parts, isSummary = false) {
         } else if (data.promptFeedback && data.promptFeedback.blockReason) {
              addMessageToChat({ role: 'model', parts: [{text: `请求被阻止: ${data.promptFeedback.blockReason}. ${data.promptFeedback.blockReasonMessage || ''}`}], timestamp: Date.now() });
         } else {
-            addMessageToChat({ role: 'model', parts: [{text: '未能从API获取有效回复。'}], timestamp: Date.now() });
+            console.warn("Gemini API Response did not contain expected content:", data);
+            addMessageToChat({ role: 'model', parts: [{text: '未能从API获取有效回复。响应结构可能不符合预期。'}], timestamp: Date.now() });
         }
     } catch (error) {
         console.error('Error calling Gemini API:', error);
@@ -491,24 +567,25 @@ async function callGeminiAPI(parts, isSummary = false) {
 
 function addMessageToChat(message) {
     if (!message.parts || !Array.isArray(message.parts) || message.parts.length === 0 || typeof message.parts[0].text !== 'string') {
-        // Fallback for older message formats or simple text messages
         message.parts = [{ text: message.text || "无效消息格式" }];
     }
-    
+
     if (message.isTempStatus && message.parts[0].text.includes("正在总结链接")) {
-        const existingTempLinkSummaryMsg = currentChat.find(msg => msg.isTempStatus && msg.parts[0].text.includes("正在总结链接"));
-        if (existingTempLinkSummaryMsg) {
-            if (currentChat.some(m => m.isTempStatus && m.parts[0].text === message.parts[0].text)) return message; 
-        }
+         // Remove any existing "summarizing link" messages to prevent duplicates
+        removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.includes("正在总结链接"));
     }
-    
+     if (message.isTempStatus && message.parts[0].text.includes("正在加载并处理图片...")) {
+        removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.includes("正在加载并处理图片..."));
+    }
+
+
     const messageWithTimestamp = { ...message, timestamp: message.timestamp || Date.now()};
     currentChat.push(messageWithTimestamp);
     renderCurrentChat();
     if (!message.isTempStatus && !message.isThinking) {
       saveCurrentChat();
     }
-    return messageWithTimestamp; 
+    return messageWithTimestamp;
 }
 
 
@@ -519,23 +596,27 @@ function renderCurrentChat() {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message', msg.role === 'user' ? 'user' : 'ai');
         if (msg.isTempStatus) messageDiv.classList.add('temporary-status');
+        if (msg.isThinking) messageDiv.classList.add('thinking-status');
+
 
         let contentHtml = '';
         if (msg.parts && msg.parts[0] && typeof msg.parts[0].text === 'string') {
             if (msg.role === 'model' && typeof marked !== 'undefined' && typeof marked.parse === 'function' && !msg.isTempStatus && !msg.isThinking) {
                 try {
-                    contentHtml = marked.parse(msg.parts[0].text);
+                    // Ensure text is a string before passing to marked.parse
+                    const textToParse = String(msg.parts[0].text || "");
+                    contentHtml = marked.parse(textToParse);
                 } catch (e) {
-                    console.error("Error parsing markdown:", e);
-                    contentHtml = escapeHtml(msg.parts[0].text); 
+                    console.error("Error parsing markdown:", e, "for text:", msg.parts[0].text);
+                    contentHtml = escapeHtml(String(msg.parts[0].text || ""));
                 }
-            } else { 
-                contentHtml = escapeHtml(msg.parts[0].text).replace(/\n/g, '<br>');
+            } else {
+                contentHtml = escapeHtml(String(msg.parts[0].text || "")).replace(/\n/g, '<br>');
             }
         } else {
             contentHtml = "内容不可用";
         }
-        
+
         const contentWrapper = document.createElement('div');
         contentWrapper.classList.add('message-content-wrapper');
         contentWrapper.innerHTML = contentHtml;
@@ -549,23 +630,22 @@ function renderCurrentChat() {
         timestampSpan.textContent = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         footerDiv.appendChild(timestampSpan);
 
-        if (msg.role === 'model' && !msg.isThinking && !msg.isTempStatus) {
+        if (msg.role === 'model' && !msg.isThinking && !msg.isTempStatus && !msg.archived) { // Don't show archive for already archived
             const archiveElement = document.createElement('span');
             archiveElement.classList.add('archive-action');
-
-            if (msg.archived) {
-                archiveElement.textContent = '已存档';
-                archiveElement.classList.add('archived-text');
-            } else {
-                archiveElement.innerHTML = '&#x1F4C1;'; 
-                archiveElement.title = '存档此问答';
-                archiveElement.classList.add('archive-icon');
-                archiveElement.onclick = (e) => {
-                    e.stopPropagation();
-                    archiveQaPair(index); 
-                };
-            }
+            archiveElement.innerHTML = '&#x1F4C1;'; // Folder icon
+            archiveElement.title = '存档此问答';
+            archiveElement.classList.add('archive-icon');
+            archiveElement.onclick = (e) => {
+                e.stopPropagation();
+                archiveQaPair(index);
+            };
             footerDiv.appendChild(archiveElement);
+        } else if (msg.archived) {
+            const archivedTextSpan = document.createElement('span');
+            archivedTextSpan.classList.add('archived-text');
+            archivedTextSpan.textContent = '已存档';
+            footerDiv.appendChild(archivedTextSpan);
         }
         messageDiv.appendChild(footerDiv);
         chatOutput.appendChild(messageDiv);
@@ -591,42 +671,82 @@ function clearSelectedTextPreview() {
     if (selectedTextContent) selectedTextContent.textContent = '';
 }
 
-function saveChatHistory() { 
-    const cleanAllChats = allChats.map(chat => 
+function saveChatHistory() {
+    const cleanAllChats = allChats.map(chat =>
         chat.filter(msg => !msg.isTempStatus && !msg.isThinking)
     );
     chrome.storage.local.set({ 'geminiChatHistory': cleanAllChats });
 }
 
-function saveCurrentChat() { 
+function saveCurrentChat() {
     const chatToStore = currentChat.filter(msg => !(msg.isThinking || msg.isTempStatus));
 
-    if (chatToStore.length === 0) {
-        saveChatHistory();
-        return;
+    if (chatToStore.length === 0 && allChats.length > 0 && allChats[0]?.length === 0) {
+        // Avoid saving an empty current chat if allChats[0] is already empty or doesn't exist
+        // Or if the first history item is already this empty chat (e.g. after split)
+         const firstHistIsEmpty = allChats.length > 0 && allChats[0].length === 0;
+         if(!firstHistIsEmpty && allChats.length > 0 && currentChat.length === 0){
+            // if current chat is empty but was previously the one at allChats[0]
+            // we might want to remove it or update it to empty.
+            // For now, let's not add a new empty chat if allChats[0] was the one just cleared.
+         } else if (currentChat.length > 0 || allChats.length === 0 || (allChats.length > 0 && allChats[0].length > 0) ) {
+            // Proceed to save if currentChat has content, or if there's no history, or if current history head isn't already empty
+         } else {
+            // Potentially, currentChat is empty and allChats[0] was just this chat.
+            // If allChats[0] corresponds to the *just cleared* currentChat, update it.
+            const currentChatOriginalTimestamp = currentChat[0]?.timestamp; // This will be undefined if currentChat is empty
+            const allChatsHeadTimestamp = allChats[0]?.[0]?.timestamp;
+            if(allChats.length > 0 && !currentChatOriginalTimestamp && allChatsHeadTimestamp &&
+               currentChat.length === 0 && allChats[0].length > 0 &&
+               !allChats.find(c => c.length > 0 && c[0].timestamp === allChatsHeadTimestamp && c.every(m => m.isThinking || m.isTempStatus))
+            ){
+                 // This case is tricky: current chat is empty, allChats[0] is not empty.
+                 // If currentChat was previously allChats[0] and got cleared, allChats[0] should reflect that.
+                 // This is complex to track perfectly without more IDs.
+                 // The current logic below handles updating existing or unshifting new.
+            }
+         }
     }
-    
+
+
     let foundAndUpdated = false;
-    if (allChats.length > 0) {
+    if (allChats.length > 0 && chatToStore.length > 0) { // Only update if chatToStore has content
         const existingChatIndex = allChats.findIndex(
             histChat => histChat.length > 0 && chatToStore.length > 0 && histChat[0].timestamp === chatToStore[0].timestamp
         );
 
-        if (existingChatIndex !== -1) { 
-            allChats[existingChatIndex] = [...chatToStore]; 
+        if (existingChatIndex !== -1) {
+            allChats[existingChatIndex] = [...chatToStore];
             foundAndUpdated = true;
+        }
+    } else if (allChats.length > 0 && chatToStore.length === 0) {
+        // If current chat became empty, check if it was the head of allChats
+        const firstHistChat = allChats[0];
+        // This requires a robust way to identify if firstHistChat *was* the currentChat.
+        // For simplicity, if currentChat is empty, we don't add a new empty entry if allChats[0] was non-empty.
+        // If allChats[0] was the one being cleared, it should ideally be removed or replaced by an empty array.
+        // The split logic handles this by creating a new chat.
+        // If user just clears history or deletes the current one, currentChat becomes empty.
+        // Let's assume for now that an empty currentChat does not create a new history entry unless allChats is empty.
+        if (allChats[0] && allChats[0].length > 0 && currentChat.length === 0 && allChats[0][0].timestamp === currentChat[0]?.timestamp) {
+             // This condition is hard to meet if currentChat is empty.
+             // The logic below will not unshift an empty chatToStore if allChats is not empty.
         }
     }
 
-    if (!foundAndUpdated) { 
-        allChats.unshift([...chatToStore]); 
+
+    if (!foundAndUpdated && chatToStore.length > 0) {
+        allChats.unshift([...chatToStore]);
+    } else if (allChats.length === 0 && chatToStore.length > 0){ // If allChats was empty, and current is not
+        allChats.unshift([...chatToStore]);
     }
 
-    if (allChats.length > 50) { 
+
+    if (allChats.length > 50) {
         allChats = allChats.slice(0, 50);
     }
-    saveChatHistory(); 
-    renderChatHistoryList(); 
+    saveChatHistory();
+    renderChatHistoryList();
 }
 
 
@@ -634,15 +754,18 @@ async function loadChatHistory() {
     return new Promise(resolve => {
         chrome.storage.local.get(['geminiChatHistory'], (result) => {
             if (result.geminiChatHistory) {
-                allChats = result.geminiChatHistory.map(chat => chat.filter(msg => msg.parts && msg.parts.length > 0 && msg.parts[0].text));
+                allChats = result.geminiChatHistory.map(chat => chat.filter(msg => msg.parts && msg.parts.length > 0 && typeof msg.parts[0].text === 'string'));
+                 allChats = allChats.filter(chat => chat.length > 0); // Remove empty chats from history
             } else {
                 allChats = [];
             }
 
-            if (allChats.length > 0 && currentChat.length === 0) { 
-                currentChat = [...allChats[0]];
-            } else if (currentChat.length === 0) { 
-                 currentChat = [];
+            if (currentChat.length === 0) { // Only load from history if current chat is empty
+                if (allChats.length > 0) {
+                    currentChat = [...allChats[0]];
+                } else {
+                     currentChat = []; // Start with a truly empty chat if no history
+                }
             }
             renderCurrentChat();
             renderChatHistoryList();
@@ -673,80 +796,25 @@ function saveArchivedChats() {
 
 
 function renderChatHistoryList() {
-    if (!chatHistoryList) return;
+    // This function is called but chatHistoryList element was removed.
+    // For now, it will do nothing gracefully.
+    // If history needs to be displayed differently (e.g. in a dropdown), this needs rework.
+    // The 'More history actions' details/summary is the current UI for history management.
+    if (!chatHistoryList) { // chatHistoryList is the old element ID, not used by <details>
+        // console.log("renderChatHistoryList called, but no chatHistoryList element found. History UI is now via 'More history actions'.");
+        return;
+    }
+    // Keep old logic commented out in case of future UI changes to re-introduce a list
+    /*
     chatHistoryList.innerHTML = '';
     allChats.forEach((chat, index) => {
         if (chat.length > 0) {
             const historyItem = document.createElement('div');
-            historyItem.classList.add('history-item');
-            
-            const firstMeaningfulMsg = chat.find(msg => msg.parts && msg.parts[0] && msg.parts[0].text && !msg.isThinking && !msg.isTempStatus);
-            let titleText = `对话 ${allChats.length - index}`;
-            if (firstMeaningfulMsg) {
-                const rolePrefix = firstMeaningfulMsg.role === 'user' ? "You: " : "AI: ";
-                titleText = rolePrefix + firstMeaningfulMsg.parts[0].text.substring(0, 30) + (firstMeaningfulMsg.parts[0].text.length > 30 ? '...' : '');
-            }
-            
-            const titleSpan = document.createElement('span');
-            titleSpan.classList.add('history-item-title');
-            titleSpan.textContent = titleText;
-            historyItem.appendChild(titleSpan);
-
-            const buttonsWrapper = document.createElement('div');
-            buttonsWrapper.classList.add('history-item-buttons');
-
-            const archiveButton = document.createElement('button');
-            archiveButton.textContent = '存档';
-            archiveButton.classList.add('archive-btn');
-            archiveButton.title = '将此完整对话存档';
-            archiveButton.onclick = (e) => {
-                e.stopPropagation();
-                if (confirm(`确定要存档这个完整对话 ("${titleText}") 吗？`)) {
-                    const chatToArchiveFromHistory = allChats.splice(index, 1)[0];
-                    const cleanChatToArchive = chatToArchiveFromHistory.map(m => {
-                        const copy = {...m};
-                        delete copy.archived;
-                        return copy;
-                    });
-                    archivedChats.unshift(cleanChatToArchive);
-                    saveChatHistory(); 
-                    saveArchivedChats(); 
-                    renderChatHistoryList(); 
-                    if (currentChat.length > 0 && chatToArchiveFromHistory.length > 0 && currentChat[0]?.timestamp === chatToArchiveFromHistory[0]?.timestamp) {
-                        currentChat = [];
-                        renderCurrentChat();
-                        addMessageToChat({ role: 'model', parts: [{text: '当前对话已存档。新对话开始。'}], timestamp: Date.now() });
-                    }
-                }
-            };
-            buttonsWrapper.appendChild(archiveButton);
-
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = '删除';
-            deleteButton.classList.add('delete-btn');
-            deleteButton.onclick = (e) => {
-                e.stopPropagation();
-                if (confirm(`确定要删除这个对话 ("${titleText}") 吗？`)) {
-                    const deletedChat = allChats.splice(index, 1)[0];
-                    saveChatHistory();
-                    renderChatHistoryList();
-                    if (currentChat.length > 0 && deletedChat.length > 0 && currentChat[0]?.timestamp === deletedChat[0]?.timestamp) {
-                        currentChat = [];
-                        renderCurrentChat();
-                         addMessageToChat({ role: 'model', parts: [{text: '当前对话已从历史中删除。新对话开始。'}], timestamp: Date.now() });
-                    }
-                }
-            };
-            buttonsWrapper.appendChild(deleteButton);
-            historyItem.appendChild(buttonsWrapper);
-
-            historyItem.onclick = () => { 
-                currentChat = [...chat];
-                renderCurrentChat();
-            };
+            // ... rest of the old list rendering logic
             chatHistoryList.appendChild(historyItem);
         }
     });
+    */
 }
 
 document.addEventListener('DOMContentLoaded', initialize);
