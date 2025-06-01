@@ -1,4 +1,4 @@
-// background.js
+// g-extension/background.js
 let geminiApiKey = null;
 
 async function loadApiKey() {
@@ -9,14 +9,31 @@ async function loadApiKey() {
       console.log("Background: Gemini API Key loaded.");
     } else {
       console.warn("Background: Gemini API Key not found in storage.");
+      // Optionally, you could open the options page here if the key is missing
+      // chrome.runtime.openOptionsPage();
     }
   } catch (e) {
     console.error("Background: Error loading API Key:", e);
   }
 }
 
-// Load API key when the background script starts
-loadApiKey();
+// Initialize API key and side panel behavior when the extension starts
+(async () => {
+  await loadApiKey();
+  try {
+    // This makes the extension icon click open the side panel.
+    // Requires Chrome 114+
+    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+  } catch (error) {
+    console.error("Background: Failed to set side panel behavior:", error);
+    // Fallback for older versions or if specific click handling is needed:
+    // chrome.action.onClicked.addListener(async (tab) => {
+    //   if (tab.id) {
+    //     await chrome.sidePanel.open({ tabId: tab.id });
+    //   }
+    // });
+  }
+})();
 
 // Listen for API Key changes from options page
 chrome.storage.onChanged.addListener((changes, namespace) => {
@@ -26,27 +43,12 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
   }
 });
 
-// Handle browser action click (plugin icon)
-chrome.action.onClicked.addListener((tab) => {
-  if (tab.id) {
-    chrome.tabs.sendMessage(tab.id, { action: 'toggleSidebar' }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.warn("Background: Could not send toggleSidebar message to content script:", chrome.runtime.lastError.message);
-        // This might happen on pages like chrome://extensions or new tab page where content scripts don't run.
-      } else if (response) {
-        // console.log("Background: Sidebar toggle response:", response);
-      }
-    });
-  } else {
-    console.error("Background: Tab ID not found for action click.");
-  }
-});
+// REMOVE the old chrome.action.onClicked listener that sent 'toggleSidebar'
+// chrome.action.onClicked.addListener((tab) => { ... }); // REMOVE THIS
 
-// Listen for messages from content_script.js or sidebar.js
+// Listen for messages from content_script.js or sidebar.js (now side panel)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  // console.log("Background: Received message", request);
   if (request.action === "getAndSummarizePage") {
-    // This message comes from sidebar.js, asking background to get content from content_script.js
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || tabs.length === 0 || !tabs[0].id) {
         console.error("Background (getAndSummarizePage): No active tab found or tab ID missing.");
@@ -54,41 +56,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return;
       }
       const activeTabId = tabs[0].id;
-
-      // Send message to content_script.js to get the page content
       chrome.tabs.sendMessage(activeTabId, { action: "getPageContentForSummarize" }, (pageResponse) => {
         if (chrome.runtime.lastError) {
           console.error("Background (getAndSummarizePage): Error messaging content script:", chrome.runtime.lastError.message);
           sendResponse({ error: "获取页面内容失败 (CS通讯错误): " + chrome.runtime.lastError.message });
           return;
         }
-
-        // pageResponse is from content_script.js. It should be { contentForSummary: "..." }
         if (pageResponse && typeof pageResponse.contentForSummary === 'string') {
-          // Successfully got content (or empty string if page has no text)
-          sendResponse({ contentForSummary: pageResponse.contentForSummary }); // Forward to sidebar.js
+          sendResponse({ contentForSummary: pageResponse.contentForSummary });
         } else {
-          // content_script.js didn't send the expected structure, or contentForSummary was not a string.
           console.warn("Background (getAndSummarizePage): Invalid response from content script:", pageResponse);
           sendResponse({ error: "未能从页面获取内容 (CS数据无效或格式错误)。" });
         }
       });
     });
-    return true; // Indicates that the response will be sent asynchronously
+    return true;
+  } else if (request.action === "TEXT_SELECTED_FROM_PAGE") {
+    // Forward the selected text to the side panel
+    // The side panel's sidebar.js will have a listener for this.
+    chrome.runtime.sendMessage({ type: "TEXT_SELECTED_FOR_SIDEBAR", text: request.text });
+    sendResponse({ status: "Text selected event forwarded to sidebar" });
+    return true; // Indicate async response if needed, though not strictly for this forward
   }
-
   // Handle other actions if needed
-  // For example, if API calls were to be proxied through background for security:
-  // if (request.action === "callGeminiAPI_viaBackground") {
-  //   if (!geminiApiKey) {
-  //     sendResponse({ error: "API Key not set in background." });
-  //     return true;
-  //   }
-  //   // ... (make fetch call here) ...
-  //   return true; // Async
-  // }
-
-  return false; // Default for synchronous messages or if no handler matches
+  return false;
 });
 
-console.log("Background script (gemini-sidebar) started.");
+console.log("Background script (gemini-sidebar with sidePanel) started.");
