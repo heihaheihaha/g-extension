@@ -4,15 +4,15 @@
   "version": "1.0",
   "description": "使用Gemini API总结网页、进行智能对话，并支持中文。",
   "permissions": [
-    "activeTab",      
-    "scripting",      
-    "storage",      
-    "contextMenus"   
+    "activeTab",
+    "scripting",
+    "storage",
+    "contextMenus"
   ],
   "host_permissions": [
     "https://generativelanguage.googleapis.com/"
   ],
-  "options_page": "options.html", 
+  "options_page": "options.html",
   "background": {
     "service_worker": "background.js"
   },
@@ -23,12 +23,18 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content_script.js"],
-      "css": ["sidebar_injector.css"] 
+      "css": ["sidebar_injector.css"]
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["sidebar.html", "sidebar.css", "sidebar.js", "images/*"],
+      "resources": [
+        "sidebar.html",
+        "sidebar.css",
+        "sidebar.js",
+        "libs/*",
+        "images/*"
+      ],
       "matches": ["<all_urls>"]
     }
   ],

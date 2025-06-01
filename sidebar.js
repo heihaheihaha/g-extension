@@ -21,7 +21,33 @@ const clearAllHistoryButton = document.getElementById('clearAllHistoryButton');
 
 // --- 初始化和API Key加载 ---
 async function initialize() {
-    console.log("Sidebar: Initializing...");
+    console.log("Sidebar: Initializing... typeof marked at init start:", typeof marked); // 这个日志现在应该是 "object"
+
+    // 更新后的直接测试 marked.js
+    console.log("Marked Library Test - typeof marked:", typeof marked);
+    if (typeof marked === 'object' && marked !== null && typeof marked.parse === 'function') {
+        try {
+            const testMarkdown = "**粗体测试 (Bold Test)** 和 *斜体测试 (Italic Test)*";
+            console.log("Marked Library Test - Input:", testMarkdown);
+            const testHtml = marked.parse(testMarkdown); // 使用 marked.parse()
+            console.log("Marked Library Test - Output HTML:", testHtml);
+
+            if (document.getElementById('chatOutput')) { // 确保 chatOutput 存在
+                 const testDiv = document.createElement('div');
+                 testDiv.style.border = "1px solid limegreen"; // 加上边框以便区分
+                 testDiv.innerHTML = "MARKDOWN 功能测试 (marked.parse): " + testHtml;
+                 // 最好在API Key加载和历史记录渲染之后添加，避免被清空
+                 // 或者在 chatOutput.innerHTML = ''; 之后重新添加
+                 // 为简单起见，暂时注释掉 DOM 操作，保留 console.log
+                 // document.getElementById('chatOutput').appendChild(testDiv);
+            }
+        } catch (e) {
+            console.error("Marked Library Test - Error with marked.parse():", e);
+        }
+    } else {
+        console.warn("Marked Library Test - marked is not an object or marked.parse is not a function. typeof marked:", typeof marked);
+    }
+
     try {
         const result = await chrome.storage.sync.get(['geminiApiKey']);
         console.log("Sidebar: API Key from storage sync:", result);
@@ -66,23 +92,18 @@ async function callGeminiAPI(promptPartsForAPI, isSummarization = false) {
         return;
     }
 
-    // 为API请求准备内容，确保不包含本地时间戳等额外字段
     let apiPayloadContents;
 
     if (isSummarization) {
-        // 总结请求通常不带历史上下文，只有当前指令和页面内容
         apiPayloadContents = [{ role: 'user', parts: promptPartsForAPI }];
     } else {
-        // 对话请求：使用 currentChat (它已经包含了最新的用户输入，并且 parts 已是API格式)
-        // currentChat 内部存储的已经是 {role, parts:[{text}], timestamp}
-        // 发送给API时，需要移除 timestamp
         apiPayloadContents = currentChat.map(msg => ({
             role: msg.role,
-            parts: msg.parts.map(part => ({ text: part.text })) // 确保 parts 也是纯净的
+            parts: msg.parts.map(part => ({ text: part.text }))
         }));
     }
 
-    addMessageToChat({ role: 'model', parts: [{text: '思考中...'}]}, true); // 临时"思考中"消息
+    addMessageToChat({ role: 'model', parts: [{text: '思考中...'}]}, true);
 
     try {
         const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
@@ -93,11 +114,8 @@ async function callGeminiAPI(promptPartsForAPI, isSummarization = false) {
                 "contents": apiPayloadContents,
                 "generationConfig": {
                     "temperature": 0.7,
-                    // "maxOutputTokens": isSummarization ? 2048 : 1024, // 总结可以长一些
-                    // "topK": 1,
-                    // "topP": 1,
                 },
-                "safetySettings": [ // 可以根据需要调整安全设置
+                "safetySettings": [
                     { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE" },
                     { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE" },
                     { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE" },
@@ -106,34 +124,26 @@ async function callGeminiAPI(promptPartsForAPI, isSummarization = false) {
             })
         });
 
-        removeLastMessageFromChat(); // 移除 "思考中..."
+        removeLastMessageFromChat();
 
         if (!response.ok) {
             const errorData = await response.json();
             console.error('Sidebar: Gemini API Error:', errorData);
             const errorMessage = errorData.error?.message || `API请求失败 (状态 ${response.status})`;
             addMessageToChat({ role: 'model', parts: [{text: `错误: ${errorMessage}`}], timestamp: Date.now() });
-            // 如果API调用失败，对于非总结的对话，可以考虑是否回滚最后的用户消息
-            if (!isSummarization && currentChat.length > 0 && currentChat[currentChat.length - 1].role === 'user') {
-                // currentChat.pop(); // 简单回滚
-                // renderCurrentChat();
-                // saveCurrentChat(); // 保存回滚后的状态
-            }
             return;
         }
 
         const data = await response.json();
         if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
-            const aiResponseParts = data.candidates[0].content.parts; // API返回的parts已经是 [{text:"..."}] 格式
+            const aiResponseParts = data.candidates[0].content.parts;
             const aiMessageObject = {
                 role: 'model',
                 parts: aiResponseParts,
                 timestamp: Date.now()
             };
-
-            addMessageToChat(aiMessageObject); // 显示AI回复
-
-            if (!isSummarization) { // 只有对话回复才加入并保存到 currentChat
+            addMessageToChat(aiMessageObject);
+            if (!isSummarization) {
                 currentChat.push(aiMessageObject);
                 saveCurrentChat();
             }
@@ -144,7 +154,7 @@ async function callGeminiAPI(promptPartsForAPI, isSummarization = false) {
             console.log("Sidebar: Unexpected API response structure:", data);
         }
     } catch (error) {
-        removeLastMessageFromChat(); // 移除 "思考中..."
+        removeLastMessageFromChat();
         console.error('Sidebar: Error calling Gemini API:', error);
         addMessageToChat({role: 'model', parts: [{text: `调用API时发生错误: ${error.message}`}], timestamp: Date.now()});
     }
@@ -160,24 +170,30 @@ function addMessageToChat(messageObject, isTemporary = false) {
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message', sender);
 
-    // 根据发送者处理文本
-    if (sender === 'ai' && typeof marked === 'function') { // 确保marked库已加载
-        try {
-            // 将AI的Markdown回复转换为HTML
-            // marked.parse() 是新版 Marked.js (v4+) 的推荐用法
-            // 旧版可能是 marked(text)
-            const htmlContent = marked.parse(text);
-            messageDiv.innerHTML = htmlContent; // 设置HTML内容
-        } catch (e) {
-            console.error("Sidebar: Error parsing Markdown:", e);
-            // 如果解析失败，则回退到纯文本显示
-            const fallbackPre = document.createElement('pre');
-            fallbackPre.textContent = text;
-            messageDiv.appendChild(fallbackPre);
+    if (sender === 'ai') {
+        // console.log("[AI Message] Text to parse:", text); // 你可以保留这些日志用于调试
+        // console.log("[AI Message] typeof marked:", typeof marked, "typeof marked.parse:", (marked ? typeof marked.parse : "marked is undefined"));
+
+        // 更新后的条件：检查 marked 是否是一个对象，并且它有一个名为 parse 的方法，该方法是一个函数
+        if (typeof marked === 'object' && marked !== null && typeof marked.parse === 'function') {
+            try {
+                // console.log("[AI Message] Parsing Markdown using marked.parse().");
+                const htmlContent = marked.parse(text); // 调用 marked.parse()
+                // console.log("[AI Message] Parsed HTML content:", htmlContent);
+                messageDiv.innerHTML = htmlContent;
+            } catch (e) {
+                console.error("[AI Message] Error parsing Markdown with marked.parse():", e);
+                const fallbackPre = document.createElement('pre');
+                fallbackPre.textContent = text;
+                messageDiv.appendChild(fallbackPre);
+            }
+        } else {
+            console.warn("[AI Message] marked.parse is not available or marked is not an object. Displaying as plain text. typeof marked:", typeof marked, "marked.parse:", (marked ? marked.parse : "N/A"));
+            const preTag = document.createElement('pre');
+            preTag.textContent = text;
+            messageDiv.appendChild(preTag);
         }
-    } else {
-        // 对于用户消息或解析失败/marked未加载的情况，仍然使用 <pre> 标签显示纯文本
-        // (或者，如果您希望用户输入也被解析为Markdown，可以修改此逻辑)
+    } else { // 用户消息或其他系统消息
         const preTag = document.createElement('pre');
         preTag.textContent = text;
         messageDiv.appendChild(preTag);
@@ -245,39 +261,35 @@ if (sendMessageButton) {
             return; // 没有有效输入
         }
 
-        // partsForAPI 是发送给API的，应该包含完整上下文和指令
         const partsForAPI = [{ text: combinedTextForAPI }];
-        // partsForDisplay 是显示在聊天窗口的，可以简洁一些
         const partsForDisplay = [{ text: promptForDisplay.trim() }];
 
         const userMessageObject = {
             role: 'user',
-            parts: partsForDisplay, // 用于显示
+            parts: partsForDisplay,
             timestamp: Date.now()
         };
-        const userMessageForHistory = { // 用于历史和API调用上下文
+        const userMessageForHistory = {
              role: 'user',
-             parts: partsForAPI, // 存储更完整的API指令
+             parts: partsForAPI,
              timestamp: Date.now()
         }
 
         addMessageToChat(userMessageObject);
-        currentChat.push(userMessageForHistory); // 将包含完整API指令的版本加入历史
+        currentChat.push(userMessageForHistory);
 
         if (chatInput) chatInput.value = '';
         clearSelectedTextPreview();
 
-        await callGeminiAPI(partsForAPI, false); // false表示这不是页面总结
+        await callGeminiAPI(partsForAPI, false);
     });
 }
 
 if (summarizePageButton) {
     summarizePageButton.addEventListener('click', () => {
         const summaryRequestText = '(正在请求总结当前网页...)';
-        // 显示用户请求总结的动作
         addMessageToChat({role: 'user', parts: [{text: summaryRequestText}], timestamp: Date.now()});
 
-        // 请求 background.js 获取当前页面内容
         chrome.runtime.sendMessage({ action: "getAndSummarizePage" }, async (response) => {
             if (chrome.runtime.lastError) {
                 addMessageToChat({role: 'model', parts: [{text: `总结错误 (通讯): ${chrome.runtime.lastError.message}`}], timestamp: Date.now() });
@@ -290,22 +302,8 @@ if (summarizePageButton) {
                      addMessageToChat({role: 'model', parts: [{text: `页面内容为空或未能提取到有效文本进行总结。`}], timestamp: Date.now() });
                      return;
                 }
-                // 构建总结的提示
                 const prompt = `请使用中文，清晰、简洁且全面地总结以下网页内容。如果内容包含技术信息或代码，请解释其核心概念和用途。如果是一篇文章，请提炼主要观点和论据。总结应易于理解，并抓住内容的精髓。\n\n网页内容如下：\n"${pageContent}"`;
-
-                // 对于总结，我们通常不希望它受当前对话历史的影响
-                // 临时保存并清空currentChat，调用API，然后恢复
-                // const tempCurrentChatBackup = [...currentChat];
-                // currentChat = []; // 确保总结是基于纯粹的页面内容
-
-                await callGeminiAPI([{ text: prompt }], true); // true 表示是总结请求
-
-                // currentChat = tempCurrentChatBackup; // 恢复之前的对话
-                // renderCurrentChat();
-                // 注意：总结结果目前是直接显示的，并没有加入到 currentChat 以便继续对话。
-                // 如果希望总结后可以继续对话，那么不应该清空 currentChat，
-                // 而是将总结请求和结果也作为对话的一部分。但通常总结是一次性操作。
-
+                await callGeminiAPI([{ text: prompt }], true);
             } else if (response && response.error) {
                 addMessageToChat({role: 'model', parts: [{text: `总结错误: ${response.error}`}], timestamp: Date.now() });
             } else {
@@ -318,10 +316,7 @@ if (summarizePageButton) {
 
 // 监听来自 content_script 的选中文本消息
 window.addEventListener('message', event => {
-    // 安全性: 理想情况下应检查 event.origin
-    // console.log("Sidebar: Received window message", event.data);
     if (event.data && event.data.type === 'TEXT_SELECTED') {
-        // console.log("Sidebar: TEXT_SELECTED received:", event.data.text);
         currentSelectedText = event.data.text;
         if (selectedTextContent) selectedTextContent.textContent = currentSelectedText.length > 100 ? currentSelectedText.substring(0, 97) + '...' : currentSelectedText;
         if (selectedTextPreview) selectedTextPreview.style.display = 'block';
@@ -355,17 +350,17 @@ if (clearAllHistoryButton) {
         if (confirm("确定要清除所有对话历史吗？此操作不可撤销。")) {
             allChats = [];
             currentChat = [];
-            if (currentChat.id) delete currentChat.id; // 清除当前对话的ID
-            saveChatHistory();    // 保存空的 allChats
-            renderCurrentChat();  // 清空当前聊天窗口
-            renderChatHistoryList(); // 更新历史列表显示
+            if (currentChat.id) delete currentChat.id;
+            saveChatHistory();
+            renderCurrentChat();
+            renderChatHistoryList();
             addMessageToChat({role:'model', parts:[{text: "所有对话历史已清除。"}]}, Date.now());
         }
     });
 }
 
 // --- 对话历史管理 ---
-async function saveChatHistory() { // 保存 allChats 数组
+async function saveChatHistory() {
     try {
         await chrome.storage.local.set({ 'geminiChatHistory': allChats });
     } catch (e) {
@@ -373,32 +368,29 @@ async function saveChatHistory() { // 保存 allChats 数组
     }
 }
 
-function saveCurrentChat() { // 将 currentChat 更新或添加到 allChats
-    if (currentChat.length === 0 && !currentChat.id) return; // 如果当前对话为空且没有ID，则不保存
+function saveCurrentChat() {
+    if (currentChat.length === 0 && !currentChat.id) return;
 
     const chatToSave = {
         id: currentChat.id || `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        messages: [...currentChat], // 创建副本
+        messages: [...currentChat],
         lastUpdated: Date.now(),
         title: currentChat[0]?.parts[0]?.text.substring(0, 40) + "..." || "新对话"
     };
-    if (!currentChat.id) currentChat.id = chatToSave.id; // 如果是新对话，赋予ID
+    if (!currentChat.id) currentChat.id = chatToSave.id;
 
     const existingIndex = allChats.findIndex(c => c.id === chatToSave.id);
     if (existingIndex > -1) {
-        allChats[existingIndex] = chatToSave; // 更新现有对话
+        allChats[existingIndex] = chatToSave;
     } else {
-        allChats.push(chatToSave); // 添加新对话
+        allChats.push(chatToSave);
     }
-    // 按lastUpdated降序排列
     allChats.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
-    // 只保留最近N条历史记录，避免存储过大
     const MAX_HISTORY_ITEMS = 50;
     if (allChats.length > MAX_HISTORY_ITEMS) {
-        allChats = allChats.slice(0, MAX_HISTORY_ITEMS); // 保留最新的N条
+        allChats = allChats.slice(0, MAX_HISTORY_ITEMS);
     }
-    saveChatHistory(); // 将更新后的 allChats 保存到 chrome.storage.local
-    // renderChatHistoryList(); // 通常在显式打开历史记录时渲染
+    saveChatHistory();
 }
 
 
@@ -407,7 +399,7 @@ async function loadChatHistory() {
         const result = await chrome.storage.local.get(['geminiChatHistory']);
         if (result.geminiChatHistory && Array.isArray(result.geminiChatHistory)) {
             allChats = result.geminiChatHistory;
-            allChats.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0)); // 确保加载后也排序
+            allChats.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
             console.log("Sidebar: Chat history loaded. Items:", allChats.length);
         } else {
             allChats = [];
@@ -417,8 +409,6 @@ async function loadChatHistory() {
         console.error("Sidebar: Error loading chat history:", e);
         allChats = [];
     }
-    // 默认不加载任何历史到当前聊天窗口，保持 currentChat 为空
-    // renderChatHistoryList(); // 通常在用户点击查看历史时渲染
 }
 
 function renderChatHistoryList() {
@@ -443,8 +433,8 @@ function renderChatHistoryList() {
         loadButton.title = "加载此对话到当前聊天窗口";
         loadButton.onclick = (e) => {
             e.stopPropagation();
-            currentChat = [...chatSession.messages]; // 创建副本
-            currentChat.id = chatSession.id; // 赋予ID
+            currentChat = [...chatSession.messages];
+            currentChat.id = chatSession.id;
             renderCurrentChat();
             if (historyPanel) historyPanel.style.display = 'none';
         };
@@ -455,26 +445,22 @@ function renderChatHistoryList() {
         deleteButton.onclick = (e) => {
             e.stopPropagation();
             if (confirm(`确定要删除对话 "${titleText}" 吗？`)) {
-                allChats.splice(index, 1); // 从当前渲染的allChats数组中删除
-                if(currentChat.id === chatSession.id){ // 如果删除的是当前加载的对话
+                allChats.splice(index, 1);
+                if(currentChat.id === chatSession.id){
                     currentChat = [];
                     delete currentChat.id;
                     renderCurrentChat();
                 }
-                saveChatHistory(); // 保存更改 (allChats)
-                renderChatHistoryList(); // 重新渲染列表
+                saveChatHistory();
+                renderChatHistoryList();
             }
         };
-        // 对话分割功能可以更复杂，这里仅作占位
-        // const splitButton = document.createElement('button');
-        // splitButton.textContent = '分割'; // ...
 
         buttonContainer.appendChild(loadButton);
         buttonContainer.appendChild(deleteButton);
-        // buttonContainer.appendChild(splitButton);
         itemDiv.appendChild(buttonContainer);
 
-        itemDiv.onclick = () => { // 点击条目本身也加载
+        itemDiv.onclick = () => {
             currentChat = [...chatSession.messages];
             currentChat.id = chatSession.id;
             renderCurrentChat();
