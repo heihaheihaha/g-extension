@@ -37,6 +37,9 @@
         "sidebar.html",
         "sidebar.css",
         "sidebar.js",
+        "archive.html",
+        "archive.js",
+        "archive.css",
         "libs/*",
         "images/*"
       ],

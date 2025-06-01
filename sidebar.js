@@ -4,17 +4,17 @@
 let geminiApiKey = null;
 let currentChat = [];
 let allChats = [];
+let archivedChats = []; // For temporarily holding loaded archived chats if needed by sidebar
 let currentSelectedText = null;
 
 // --- DOM 元素获取 ---
 let chatOutput, chatInput, sendMessageButton, summarizePageButton,
     selectedTextPreview, selectedTextContent, clearSelectedTextButton,
-    toggleHistoryButton, historyPanel, chatHistoryList, clearAllHistoryButton;
+    historyPanel, chatHistoryList, clearAllHistoryButton,
+    splitChatButton, saveCurrentChatButton, viewArchivedChatsButton; // New buttons
 
 // --- 初始化和API Key加载 ---
 async function initialize() {
-    // console.log("Sidebar (sidePanel): Initializing...");
-
     chatOutput = document.getElementById('chatOutput');
     chatInput = document.getElementById('chatInput');
     sendMessageButton = document.getElementById('sendMessageButton');
@@ -22,10 +22,16 @@ async function initialize() {
     selectedTextPreview = document.getElementById('selectedTextPreview');
     selectedTextContent = document.getElementById('selectedTextContent');
     clearSelectedTextButton = document.getElementById('clearSelectedTextButton');
-    toggleHistoryButton = document.getElementById('toggleHistoryButton');
-    historyPanel = document.getElementById('history-panel');
+    historyPanel = document.getElementById('history-panel'); // Ensure this ID matches HTML if not already. Corrected from your HTML: it is class history-panel
     chatHistoryList = document.getElementById('chatHistoryList');
     clearAllHistoryButton = document.getElementById('clearAllHistoryButton');
+    splitChatButton = document.getElementById('splitChatButton');
+    saveCurrentChatButton = document.getElementById('saveCurrentChatButton');
+    viewArchivedChatsButton = document.getElementById('viewArchivedChatsButton');
+
+    // Correcting historyPanel selector if it's a class as in the HTML provided
+    historyPanel = document.querySelector('.history-panel');
+
 
     if (typeof marked !== 'object' || marked === null || typeof marked.parse !== 'function') {
         console.warn("Marked Library Test - marked is not an object or marked.parse is not a function.");
@@ -45,7 +51,9 @@ async function initialize() {
         disableInputs();
     }
 
-    loadChatHistory();
+    loadChatHistory(); // Loads allChats
+    loadArchivedChats(); // Loads archivedChats (needed for count or if sidebar interacts with them directly)
+
     if (!currentChat || currentChat.length === 0) {
         renderCurrentChat();
     }
@@ -71,41 +79,108 @@ async function initialize() {
         clearSelectedTextButton.addEventListener('click', clearSelectedTextPreview);
     }
 
-    if (toggleHistoryButton && historyPanel) {
-        toggleHistoryButton.addEventListener('click', () => {
-            const isHidden = historyPanel.style.display === 'none' || historyPanel.style.display === '';
-            historyPanel.style.display = isHidden ? 'block' : 'none';
-            if (isHidden) {
-                renderChatHistoryList();
-            }
-        });
-    }
+    // toggleHistoryButton and its listener are removed. History panel is now always visible.
 
     if (clearAllHistoryButton) {
         clearAllHistoryButton.addEventListener('click', () => {
             if (confirm("确定要清除所有对话历史吗？此操作无法撤销。")) {
                 allChats = [];
-                currentChat = [];
+                currentChat = []; // Also clear current chat if all history is wiped
                 saveChatHistory();
                 renderChatHistoryList();
-                renderCurrentChat();
+                renderCurrentChat(); // Re-render current empty chat
                 addMessageToChat({ role: 'model', parts: [{text: '所有对话历史已清除。'}], timestamp: Date.now() });
             }
+        });
+    }
+
+    if (splitChatButton) {
+        splitChatButton.addEventListener('click', handleSplitChat);
+    }
+
+    if (saveCurrentChatButton) {
+        saveCurrentChatButton.addEventListener('click', handleSaveCurrentChat);
+    }
+
+    if (viewArchivedChatsButton) {
+        viewArchivedChatsButton.addEventListener('click', () => {
+            chrome.tabs.create({ url: chrome.runtime.getURL('archive.html') });
         });
     }
 
     chrome.storage.onChanged.addListener((changes, namespace) => {
         if (namespace === 'sync' && changes.geminiApiKey) {
             geminiApiKey = changes.geminiApiKey.newValue;
-            // console.log("Sidebar: Gemini API Key updated.");
             addMessageToChat({ role: 'model', parts: [{text: 'API 密钥已更新。'}], timestamp: Date.now() });
             enableInputs();
+        }
+        if (namespace === 'local' && changes.geminiChatHistory) {
+            allChats = changes.geminiChatHistory.newValue.map(chat => chat.filter(msg => !msg.isTempStatus && !msg.isThinking));
+            renderChatHistoryList();
+        }
+        if (namespace === 'local' && changes.geminiArchivedChats) {
+            // Potentially update UI if sidebar shows archive count, etc.
+            archivedChats = changes.geminiArchivedChats.newValue;
         }
     });
 
     chrome.runtime.onMessage.addListener(handleRuntimeMessages);
-    // console.log("Sidebar (sidePanel): Initialized and event listeners attached.");
 }
+
+function handleSplitChat() {
+    const chatToArchive = currentChat.filter(msg => !(msg.isThinking || msg.isTempStatus));
+    if (chatToArchive.length > 0) {
+        // Check if this exact chat is already the latest in allChats
+        let alreadyExists = false;
+        if (allChats.length > 0) {
+            const latestHistoryChat = allChats[0];
+            if (JSON.stringify(latestHistoryChat) === JSON.stringify(chatToArchive)) {
+                alreadyExists = true;
+            }
+        }
+        if (!alreadyExists) {
+            allChats.unshift([...chatToArchive]); // Add as a new entry
+            if (allChats.length > 50) allChats.pop();
+            saveChatHistory(); // Saves allChats
+            renderChatHistoryList();
+        }
+    }
+    currentChat = [];
+    renderCurrentChat();
+    addMessageToChat({ role: 'model', parts: [{text: '对话已分割。新的对话已开始。'}], timestamp: Date.now() });
+    saveCurrentChat(); // Save the new state (empty current chat, potentially updated allChats)
+}
+
+function handleSaveCurrentChat() {
+    const chatToSave = currentChat.filter(msg => !(msg.isThinking || msg.isTempStatus));
+    if (chatToSave.length === 0) {
+        addMessageToChat({ role: 'model', parts: [{text: '当前对话为空或仅包含临时消息，无法保存。'}], timestamp: Date.now() });
+        return;
+    }
+
+    let alreadyExists = false;
+    if (allChats.length > 0) {
+        // A simple way to check for duplicates: compare with the most recent entry
+        // More sophisticated check might involve comparing content or timestamps more deeply
+        const latestHistoryChat = allChats[0];
+        if (JSON.stringify(latestHistoryChat) === JSON.stringify(chatToSave)) {
+            alreadyExists = true;
+        }
+    }
+
+    if (!alreadyExists) {
+        allChats.unshift([...chatToSave]); // Add as a new distinct entry
+        if (allChats.length > 50) { // Limit history size
+            allChats.pop();
+        }
+        saveChatHistory(); // This saves the updated allChats array
+        renderChatHistoryList();
+        addMessageToChat({ role: 'model', parts: [{text: '当前对话已保存到历史记录。'}], timestamp: Date.now() });
+    } else {
+        addMessageToChat({ role: 'model', parts: [{text: '当前对话已是最新历史记录。'}], timestamp: Date.now() });
+    }
+}
+
 
 function handleRuntimeMessages(request, sender, sendResponse) {
     if (request.type === 'TEXT_SELECTED_FOR_SIDEBAR') {
@@ -115,7 +190,6 @@ function handleRuntimeMessages(request, sender, sendResponse) {
         sendResponse({status: "Selected text received in sidebar"});
     } else if (request.type === 'SUMMARIZE_EXTERNAL_TEXT_FOR_SIDEBAR') {
         const { text, linkUrl, linkTitle, warning } = request;
-        // console.log("Sidebar: Received text for external link summary:", linkUrl);
         removeLastMessageFromChatByContent(`正在总结链接`);
 
         addMessageToChat({ role: 'user', parts: [{text: `总结请求：[${linkTitle || '链接'}](${linkUrl}) (内容长度: ${text?.length || 0})`}], timestamp: Date.now() });
@@ -132,19 +206,17 @@ function handleRuntimeMessages(request, sender, sendResponse) {
 
     } else if (request.type === 'SHOW_LINK_SUMMARY_ERROR') {
         const { message, url, title } = request;
-        // console.error("Sidebar: Error for link summary:", url, message);
         removeLastMessageFromChatByContent(`正在总结链接`);
         addMessageToChat({ role: 'model', parts: [{text: `总结链接 [${title || url}](${url}) 失败: ${message}`}], timestamp: Date.now() });
         sendResponse({status: "Error displayed"});
 
     } else if (request.type === 'LINK_SUMMARIZATION_STARTED') {
         const { url, title } = request;
-        removeLastMessageFromChatByContent(`正在总结链接`); // Clean up previous if any
+        removeLastMessageFromChatByContent(`正在总结链接`); 
         addMessageToChat({ role: 'model', parts: [{text: `正在总结链接: [${title || url}](${url})... 请稍候。`}], timestamp: Date.now(), isTempStatus: true });
         sendResponse({status: "Notified user"});
 
     } else if (request.type === "TRIGGER_SIDEBAR_PAGE_SUMMARY") {
-        // console.log("Sidebar: TRIGGER_SIDEBAR_PAGE_SUMMARY received.");
         handleSummarizeCurrentPage();
         sendResponse({ status: "Sidebar initiated page summary." });
     }
@@ -158,7 +230,7 @@ function removeLastMessageFromChatByContent(searchText) {
         if (message.parts && message.parts[0] && message.parts[0].text.includes(searchText) && (message.isTempStatus || message.isThinking)) {
             currentChat.splice(i, 1);
             renderCurrentChat();
-            saveCurrentChat(); // Save after modification
+            saveCurrentChat(); 
             return true;
         }
     }
@@ -203,7 +275,7 @@ function handleSummarizeCurrentPage() {
     addMessageToChat({role: 'user', parts: [{text: summaryRequestText}], timestamp: Date.now()});
 
     chrome.runtime.sendMessage({ action: "getAndSummarizePage" }, async (response) => {
-        removeLastMessageFromChat('user');
+        removeLastMessageFromChatByContent(summaryRequestText); // More robust removal
 
         if (chrome.runtime.lastError) {
             addMessageToChat({role: 'model', parts: [{text: `总结错误 (通讯): ${chrome.runtime.lastError.message}`}], timestamp: Date.now() });
@@ -235,12 +307,18 @@ function disableInputs() {
     if (chatInput) chatInput.disabled = true;
     if (sendMessageButton) sendMessageButton.disabled = true;
     if (summarizePageButton) summarizePageButton.disabled = true;
+    // Disable new buttons if needed
+    if (splitChatButton) splitChatButton.disabled = true;
+    if (saveCurrentChatButton) saveCurrentChatButton.disabled = true;
 }
 
 function enableInputs() {
     if (chatInput) chatInput.disabled = false;
     if (sendMessageButton) sendMessageButton.disabled = false;
     if (summarizePageButton) summarizePageButton.disabled = false;
+    // Enable new buttons
+    if (splitChatButton) splitChatButton.disabled = false;
+    if (saveCurrentChatButton) saveCurrentChatButton.disabled = false;
 }
 
 async function callGeminiAPI(parts, isSummary = false) {
@@ -254,9 +332,41 @@ async function callGeminiAPI(parts, isSummary = false) {
 
     const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`;
 
+    // Construct context from currentChat, excluding the last "thinking" message
+    const conversationContext = currentChat.filter(msg => !msg.isThinking && !msg.isTempStatus) // Exclude temporary messages
+                                        .map(msg => ({
+                                            role: msg.role,
+                                            parts: msg.parts.map(part => ({ text: part.text }))
+                                        }));
+    // Remove the last user message from context if it's the one we just added
+    // For API call, the last user message is provided in 'parts'
+    if (conversationContext.length > 0 && conversationContext.at(-1).role === 'user') {
+       // conversationContext.pop(); // The current 'parts' is the latest user message
+    }
+
+
     const requestBody = {
-        contents: [{ role: "user", parts: parts }],
+        contents: [...conversationContext], // Send the whole conversation history as context
+                                            // The API will treat the last user message in `contents` array
+                                            // as the current prompt if `parts` is what the user typed now.
+                                            // For Gemini, the API expects contents to be an array of Content objects.
+                                            // Each Content object has a role and parts.
+                                            // The provided `parts` parameter to this function IS the latest user message.
+                                            // So, we should remove the last message from `currentChat` before forming `contents` for API
+                                            // if it's the one we're sending now.
     };
+     // The `parts` argument to callGeminiAPI *is* the current user turn.
+     // So, the `conversationContext` should be the history *before* this turn.
+    const historyForAPI = currentChat.filter(msg => !(msg.isThinking || msg.isTempStatus || (msg.role === 'user' && msg.parts[0].text === parts[0].text && msg.timestamp === currentChat.at(-2)?.timestamp) ))
+                                    .slice(0, -1) // Exclude the current user message itself from history fed to API if it's already added to currentChat
+                                    .map(msg => ({
+                                        role: msg.role,
+                                        parts: msg.parts.map(part => ({ text: part.text}))
+                                    }));
+
+
+    requestBody.contents = [...historyForAPI, { role: "user", parts: parts }];
+
 
     try {
         const response = await fetch(API_ENDPOINT, {
@@ -295,13 +405,12 @@ async function callGeminiAPI(parts, isSummary = false) {
 
 function addMessageToChat(message) {
     if (!message.parts || !Array.isArray(message.parts) || message.parts.length === 0 || typeof message.parts[0].text !== 'string') {
-        // console.warn("addMessageToChat: Invalid message format, skipping.", message);
         message.parts = [{ text: message.text || "无效消息格式" }];
     }
     if (message.isTempStatus) {
         const existingTempMessage = currentChat.find(msg => msg.isTempStatus && msg.parts[0].text.includes("正在总结链接"));
         if (existingTempMessage && existingTempMessage.parts[0].text === message.parts[0].text) {
-            return;
+            return; 
         }
     }
 
@@ -310,33 +419,8 @@ function addMessageToChat(message) {
     saveCurrentChat();
 }
 
-
-function removeLastMessageFromChat(role, isThinkingMessage = false) { // Legacy, use removeLastMessageFromChatByContent for specific statuses
-    let removed = false;
-    for (let i = currentChat.length - 1; i >= 0; i--) {
-        const message = currentChat[i];
-        if (message.role === role) {
-            if (isThinkingMessage && message.isThinking) {
-                currentChat.splice(i, 1);
-                removed = true;
-                break;
-            } else if (!isThinkingMessage && !message.isThinking && !message.isTempStatus) {
-                currentChat.splice(i, 1);
-                removed = true;
-                break;
-            }
-        }
-    }
-    if (removed) {
-        renderCurrentChat();
-        saveCurrentChat();
-    }
-}
-
-
 function renderCurrentChat() {
     if (!chatOutput) {
-        // console.error("renderCurrentChat: chatOutput element not found.");
         return;
     }
     chatOutput.innerHTML = '';
@@ -352,7 +436,7 @@ function renderCurrentChat() {
                     contentHtml = marked.parse(msg.parts[0].text);
                 } catch (e) {
                     console.error("Error parsing markdown:", e);
-                    contentHtml = escapeHtml(msg.parts[0].text);
+                    contentHtml = escapeHtml(msg.parts[0].text); 
                 }
             } else {
                 contentHtml = escapeHtml(msg.parts[0].text).replace(/\n/g, '<br>');
@@ -370,7 +454,9 @@ function renderCurrentChat() {
 
         chatOutput.appendChild(messageDiv);
     });
-    chatOutput.scrollTop = chatOutput.scrollHeight;
+    if (chatOutput.scrollHeight > chatOutput.clientHeight) {
+        chatOutput.scrollTop = chatOutput.scrollHeight;
+    }
 }
 
 function escapeHtml(unsafe) {
@@ -389,68 +475,106 @@ function clearSelectedTextPreview() {
     if (selectedTextContent) selectedTextContent.textContent = '';
 }
 
+// Saves allChats to storage
 function saveChatHistory() {
-    const chatToSave = currentChat.filter(msg => !(msg.isThinking || msg.isTempStatus));
-    if (chatToSave.length > 0) {
-        const existingChatIndex = allChats.findIndex(
-            (chat) => chat.length > 0 && chatToSave.length > 0 &&
-                      chat[chat.length - 1]?.timestamp === chatToSave[chatToSave.length - 1]?.timestamp && // Add ?. for safety
-                      chat[0]?.timestamp === chatToSave[0]?.timestamp
-        );
-
-        if (existingChatIndex !== -1) {
-            allChats[existingChatIndex] = [...chatToSave];
-        } else {
-            if (chatToSave.some(msg => msg.parts.some(p => p.text && p.text.trim() !== ''))) {
-                 allChats.unshift([...chatToSave]);
-            }
-        }
-        if (allChats.length > 50) {
-            allChats.pop();
-        }
-    }
     const cleanAllChats = allChats.map(chat => chat.filter(msg => !msg.isTempStatus && !msg.isThinking));
     chrome.storage.local.set({ 'geminiChatHistory': cleanAllChats });
 }
 
+// Saves the currentChat into allChats (usually as the first element) and then calls saveChatHistory
 function saveCurrentChat() {
-    if (currentChat && currentChat.length > 0) {
-        const chatToStore = currentChat.filter(msg => !(msg.isThinking || msg.isTempStatus));
-         if (chatToStore.length === 0 && currentChat.some(msg => msg.isThinking || msg.isTempStatus)) {
-            // No substantial content to save as the "current chat" in allChats yet
-         } else if (chatToStore.length === 0) {
-            return;
-         }
+    const chatToStore = currentChat.filter(msg => !(msg.isThinking || msg.isTempStatus));
 
-        if (allChats.length > 0 &&
-            allChats[0].length > 0 && chatToStore.length > 0 &&
-            allChats[0][0]?.timestamp === chatToStore[0]?.timestamp) {
-            allChats[0] = [...chatToStore];
+    if (chatToStore.length === 0) { // Don't save if current chat is empty or only temp
+        if (currentChat.some(msg => msg.isThinking || msg.isTempStatus)) {
+            // If it only had temp messages, don't try to save it as a persistent chat record
+        } else {
+             // If currentChat is truly empty, and allChats exists, we don't need to do much
+             // unless an action just cleared currentChat and expects allChats to be persisted.
         }
-        saveChatHistory();
     } else {
-        saveChatHistory();
+        // Check if allChats[0] is the same as chatToStore to avoid trivial duplicate updates
+        if (allChats.length > 0 &&
+            allChats[0].length > 0 &&
+            JSON.stringify(allChats[0]) === JSON.stringify(chatToStore)) {
+            // It's the same as the most recent, no need to add again, just ensure history is saved
+        } else {
+            // It's a new or significantly different chat, add it
+            // Find if an identical chat already exists as allChats[0] based on first/last message timestamps
+            const existingChatIndex = allChats.findIndex(
+                (chat) => chat.length > 0 && chatToStore.length > 0 &&
+                          chat[0]?.timestamp === chatToStore[0]?.timestamp &&
+                          chat[chat.length-1]?.timestamp === chatToStore[chatToStore.length-1]?.timestamp &&
+                          JSON.stringify(chat) === JSON.stringify(chatToStore) // Stricter check
+            );
+
+            if (existingChatIndex === 0) { // if it's the first one and identical
+                allChats[0] = [...chatToStore]; // Update it
+            } else if (existingChatIndex > 0) { // if it exists elsewhere, move to top
+                allChats.splice(existingChatIndex, 1);
+                allChats.unshift([...chatToStore]);
+            }
+            else { // It's a new chat
+                allChats.unshift([...chatToStore]);
+            }
+        }
+        if (allChats.length > 50) { // Keep history to a manageable size
+            allChats.pop();
+        }
     }
+    saveChatHistory(); // Persist allChats
 }
 
 
 function loadChatHistory() {
     chrome.storage.local.get(['geminiChatHistory'], (result) => {
         if (result.geminiChatHistory) {
-            allChats = result.geminiChatHistory.map(chat => chat.filter(msg => !msg.isTempStatus && !msg.isThinking));
+            allChats = result.geminiChatHistory.map(chat => chat.filter(msg => !msg.isTempStatus && !msg.isThinking && msg.parts && msg.parts.length > 0 && msg.parts[0].text));
         } else {
             allChats = [];
         }
 
         if (allChats.length > 0) {
-            currentChat = [...allChats[0]];
+            // Load the most recent chat into currentChat if currentChat is empty
+            // Or, if a chat was previously selected from history, that would be currentChat.
+            // For now, if currentChat is empty, load the latest.
+            if (currentChat.length === 0) {
+                 currentChat = [...allChats[0]];
+            }
         } else {
-            currentChat = [];
+            // currentChat might have been initialized with a welcome message if allChats is empty
+            if (currentChat.length === 0) {
+                 currentChat = []; // Or a default welcome message
+            }
         }
         renderCurrentChat();
         renderChatHistoryList();
     });
 }
+
+function loadArchivedChats() {
+    chrome.storage.local.get(['geminiArchivedChats'], (result) => {
+        if (result.geminiArchivedChats) {
+            archivedChats = result.geminiArchivedChats;
+        } else {
+            archivedChats = [];
+        }
+        // No rendering here, archive.html will handle it.
+        // We could update a counter for the "View Archived Chats" button if desired.
+        if (viewArchivedChatsButton) {
+            // Example: viewArchivedChatsButton.textContent = `View Archived Chats (${archivedChats.length})`;
+        }
+    });
+}
+
+function saveArchivedChats() {
+    chrome.storage.local.set({ 'geminiArchivedChats': archivedChats });
+    // Update button text if showing count
+    if (viewArchivedChatsButton) {
+        // Example: viewArchivedChatsButton.textContent = `View Archived Chats (${archivedChats.length})`;
+    }
+}
+
 
 function renderChatHistoryList() {
     if (!chatHistoryList) return;
@@ -459,40 +583,72 @@ function renderChatHistoryList() {
         if (chat.length > 0) {
             const historyItem = document.createElement('div');
             historyItem.classList.add('history-item');
-            const firstUserMsg = chat.find(msg => msg.role === 'user');
+            const firstUserMsg = chat.find(msg => msg.role === 'user' && msg.parts && msg.parts[0] && msg.parts[0].text);
             let titleText = `对话 ${allChats.length - index}`;
             if (firstUserMsg && firstUserMsg.parts && firstUserMsg.parts[0] && firstUserMsg.parts[0].text) {
                 titleText = firstUserMsg.parts[0].text.substring(0, 30) + (firstUserMsg.parts[0].text.length > 30 ? '...' : '');
             } else {
-                 const firstModelMsg = chat.find(msg => msg.role === 'model' && !msg.isThinking && !msg.isTempStatus);
+                 const firstModelMsg = chat.find(msg => msg.role === 'model' && !msg.isThinking && !msg.isTempStatus && msg.parts && msg.parts[0] && msg.parts[0].text);
                  if (firstModelMsg && firstModelMsg.parts && firstModelMsg.parts[0] && firstModelMsg.parts[0].text) {
                      titleText = "AI: " + firstModelMsg.parts[0].text.substring(0, 27) + (firstModelMsg.parts[0].text.length > 27 ? '...' : '');
+                 } else if (chat[0] && chat[0].parts && chat[0].parts[0] && chat[0].parts[0].text) { // Fallback to first message
+                    titleText = (chat[0].role === 'user' ? "User: " : "AI: ") + chat[0].parts[0].text.substring(0,25) + (chat[0].parts[0].text.length > 25 ? "..." : "");
                  }
             }
-            historyItem.textContent = titleText;
+            
+            const titleSpan = document.createElement('span');
+            titleSpan.classList.add('history-item-title');
+            titleSpan.textContent = titleText;
+            historyItem.appendChild(titleSpan);
+
+            const buttonsWrapper = document.createElement('div');
+            buttonsWrapper.classList.add('history-item-buttons');
+
+            const archiveButton = document.createElement('button');
+            archiveButton.textContent = '存档';
+            archiveButton.classList.add('archive-btn');
+            archiveButton.onclick = (e) => {
+                e.stopPropagation();
+                if (confirm(`确定要存档这个对话 ("${titleText}") 吗？它将从主历史列表移动到存档。`)) {
+                    const chatToArchive = allChats.splice(index, 1)[0];
+                    archivedChats.unshift(chatToArchive); // Add to beginning of archives
+                    saveChatHistory(); // Save modified allChats
+                    saveArchivedChats(); // Save new archivedChats
+                    renderChatHistoryList(); // Re-render history
+                    // If the archived chat was the current chat, clear current chat
+                    if (currentChat.length > 0 && chatToArchive.length > 0 && currentChat[0]?.timestamp === chatToArchive[0]?.timestamp) {
+                        currentChat = [];
+                        renderCurrentChat();
+                        addMessageToChat({ role: 'model', parts: [{text: '当前对话已存档。新对话开始。'}], timestamp: Date.now() });
+                    }
+                }
+            };
+            buttonsWrapper.appendChild(archiveButton);
 
             const deleteButton = document.createElement('button');
             deleteButton.textContent = '删除';
+            deleteButton.classList.add('delete-btn');
             deleteButton.onclick = (e) => {
                 e.stopPropagation();
                 if (confirm(`确定要删除这个对话 ("${titleText}") 吗？`)) {
-                    allChats.splice(index, 1);
+                    const deletedChat = allChats.splice(index, 1)[0];
                     saveChatHistory();
                     renderChatHistoryList();
-                    if (currentChat.length > 0 && chat.length > 0 && currentChat[0]?.timestamp === chat[0]?.timestamp) {
+                    if (currentChat.length > 0 && deletedChat.length > 0 && currentChat[0]?.timestamp === deletedChat[0]?.timestamp) {
                         currentChat = [];
                         renderCurrentChat();
                          addMessageToChat({ role: 'model', parts: [{text: '当前对话已从历史中删除。新对话开始。'}], timestamp: Date.now() });
                     }
                 }
             };
-            historyItem.appendChild(deleteButton);
+            buttonsWrapper.appendChild(deleteButton);
+            historyItem.appendChild(buttonsWrapper);
 
-            historyItem.onclick = () => {
+            historyItem.onclick = () => { // Load chat on click
                 currentChat = [...chat];
                 renderCurrentChat();
-                saveCurrentChat();
-                if (historyPanel) historyPanel.style.display = 'none';
+                // No need to saveCurrentChat() here as it's just loading, not modifying
+                // if (historyPanel) historyPanel.style.display = 'none'; // History panel is always visible now
             };
             chatHistoryList.appendChild(historyItem);
         }

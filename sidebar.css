@@ -1,16 +1,105 @@
-body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+/* Add or adjust existing styles in sidebar.css */
+body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; font-size: 14px; }
 .sidebar-container { padding: 10px; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
-.controls button { margin-bottom: 10px; padding: 8px; width: 100%; }
-.chat-area { flex-grow: 1; display: flex; flex-direction: column; border: 1px solid #ccc; padding: 5px; }
-#chatOutput { flex-grow: 1; overflow-y: auto; margin-bottom: 10px; padding: 5px; border: 1px solid #eee; min-height: 100px;}
-.message { margin-bottom: 8px; padding: 6px; border-radius: 4px; }
-.message.user { background-color: #e1f5fe; text-align: right; margin-left: 20%; }
-.message.ai { background-color: #f0f0f0; /* Removed margin-right: 20%; */ }
-.message .timestamp { font-size: 0.7em; color: #777; display: block; }
-#selectedTextPreview { font-size: 0.9em; }
-#chatInput { width: calc(100% - 12px); min-height: 60px; margin-bottom: 5px; padding: 5px; }
-#sendMessageButton { padding: 10px; }
-.history-panel { border-top: 1px solid #ccc; padding-top: 10px; margin-top: 10px; max-height: 30%; overflow-y: auto; }
-.history-item { padding: 5px; border-bottom: 1px solid #eee; cursor: pointer; }
+
+.controls { 
+    display: flex; 
+    flex-wrap: wrap; /* Allow buttons to wrap if not enough space */
+    gap: 5px; /* Space between buttons */
+    margin-bottom: 10px; 
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ccc;
+}
+.controls button { 
+    padding: 8px 10px; 
+    flex-grow: 1; /* Allow buttons to grow and fill space */
+    min-width: 120px; /* Minimum width for buttons */
+    border: 1px solid #ccc;
+    background-color: #f0f0f0;
+    cursor: pointer;
+    border-radius: 4px;
+}
+.controls button:hover {
+    background-color: #e0e0e0;
+}
+
+
+.chat-area { flex-grow: 1; display: flex; flex-direction: column; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px; }
+#chatOutput { flex-grow: 1; overflow-y: auto; margin-bottom: 10px; padding: 5px; border: 1px solid #eee; min-height: 150px;} /* Increased min-height */
+.message { margin-bottom: 8px; padding: 8px 10px; border-radius: 6px; line-height: 1.4; }
+.message.user { background-color: #e1f5fe; text-align: left; margin-left: 0; margin-right: 20%; } /* Adjusted for LTR */
+.message.ai { background-color: #f0f0f0; margin-left: 20%; margin-right: 0; } /* Adjusted for LTR */
+.message .timestamp { font-size: 0.75em; color: #666; display: block; margin-top: 4px; }
+#selectedTextPreview { font-size: 0.9em; background-color: #f9f9f9; }
+#chatInput { width: calc(100% - 12px); min-height: 70px; margin-bottom: 5px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+#sendMessageButton { padding: 10px 15px; width: 100%; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+#sendMessageButton:hover { background-color: #0056b3; }
+
+.history-panel { 
+    border-top: 1px solid #ccc; 
+    padding-top: 10px; 
+    margin-top: 10px; 
+    max-height: 35%;  /* Adjust as needed */
+    overflow-y: auto; 
+    display: block !important; /* Ensure it's visible */
+}
+.history-panel h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 1em;
+    font-weight: bold;
+}
+.history-item { 
+    padding: 8px 10px; 
+    border-bottom: 1px solid #eee; 
+    cursor: pointer; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+}
 .history-item:hover { background-color: #f9f9f9; }
-.history-item button { margin-left: 10px; float: right; }
+.history-item-title {
+    flex-grow: 1;
+    margin-right: 10px;
+    font-size: 0.9em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.history-item-buttons button {
+    margin-left: 5px;
+    padding: 3px 6px;
+    font-size: 0.8em;
+    cursor: pointer;
+    border: 1px solid #ddd;
+    background-color: #fff;
+    border-radius: 3px;
+}
+.history-item-buttons button.archive-btn:hover {
+    background-color: #e6f7ff; /* Light blue */
+    border-color: #91d5ff;
+}
+.history-item-buttons button.delete-btn:hover {
+    background-color: #ffebe6; /* Light red */
+    border-color: #ffccc7;
+}
+
+
+#clearAllHistoryButton {
+    display: block;
+    width: calc(100% - 20px);
+    margin: 10px auto 0 auto;
+    padding: 8px;
+    background-color: #ff4d4f;
+    color: white;
+    border: none;
+    border-radius: 4px;
+}
+#clearAllHistoryButton:hover {
+    background-color: #d9363e;
+}
+
+.temporary-status {
+    font-style: italic;
+    color: #777;
+}
