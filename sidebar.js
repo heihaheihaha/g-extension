@@ -21,7 +21,7 @@ const clearAllHistoryButton = document.getElementById('clearAllHistoryButton');
 
 // --- 初始化和API Key加载 ---
 async function initialize() {
-    console.log("Sidebar: Initializing... typeof marked at init start:", typeof marked); // 这个日志现在应该是 "object"
+    console.log("Sidebar: Initializing... typeof marked at init start:", typeof marked); 
 
     // 更新后的直接测试 marked.js
     console.log("Marked Library Test - typeof marked:", typeof marked);
@@ -29,17 +29,13 @@ async function initialize() {
         try {
             const testMarkdown = "**粗体测试 (Bold Test)** 和 *斜体测试 (Italic Test)*";
             console.log("Marked Library Test - Input:", testMarkdown);
-            const testHtml = marked.parse(testMarkdown); // 使用 marked.parse()
+            const testHtml = marked.parse(testMarkdown); 
             console.log("Marked Library Test - Output HTML:", testHtml);
 
-            if (document.getElementById('chatOutput')) { // 确保 chatOutput 存在
+            if (document.getElementById('chatOutput')) { 
                  const testDiv = document.createElement('div');
-                 testDiv.style.border = "1px solid limegreen"; // 加上边框以便区分
+                 testDiv.style.border = "1px solid limegreen"; 
                  testDiv.innerHTML = "MARKDOWN 功能测试 (marked.parse): " + testHtml;
-                 // 最好在API Key加载和历史记录渲染之后添加，避免被清空
-                 // 或者在 chatOutput.innerHTML = ''; 之后重新添加
-                 // 为简单起见，暂时注释掉 DOM 操作，保留 console.log
-                 // document.getElementById('chatOutput').appendChild(testDiv);
             }
         } catch (e) {
             console.error("Marked Library Test - Error with marked.parse():", e);
@@ -63,14 +59,13 @@ async function initialize() {
         disableInputs();
     }
 
-    loadChatHistory(); // 加载历史对话
-    renderCurrentChat(); // 渲染当前（可能为空的）对话
+    loadChatHistory(); 
+    renderCurrentChat(); 
 
-    // 通知 content_script (父窗口) 此 iframe 已准备就绪
     if (window.parent && window.parent !== window) {
         try {
             console.log("Sidebar: Sending SIDEBAR_READY to parent.");
-            window.parent.postMessage({ type: 'SIDEBAR_READY' }, '*'); // 使用 '*' 作为 targetOrigin，或更精确的来源
+            window.parent.postMessage({ type: 'SIDEBAR_READY' }, '*'); 
         } catch (e) {
             console.error("Sidebar: Error sending SIDEBAR_READY to parent:", e);
         }
@@ -171,15 +166,9 @@ function addMessageToChat(messageObject, isTemporary = false) {
     messageDiv.classList.add('message', sender);
 
     if (sender === 'ai') {
-        // console.log("[AI Message] Text to parse:", text); // 你可以保留这些日志用于调试
-        // console.log("[AI Message] typeof marked:", typeof marked, "typeof marked.parse:", (marked ? typeof marked.parse : "marked is undefined"));
-
-        // 更新后的条件：检查 marked 是否是一个对象，并且它有一个名为 parse 的方法，该方法是一个函数
         if (typeof marked === 'object' && marked !== null && typeof marked.parse === 'function') {
             try {
-                // console.log("[AI Message] Parsing Markdown using marked.parse().");
-                const htmlContent = marked.parse(text); // 调用 marked.parse()
-                // console.log("[AI Message] Parsed HTML content:", htmlContent);
+                const htmlContent = marked.parse(text); 
                 messageDiv.innerHTML = htmlContent;
             } catch (e) {
                 console.error("[AI Message] Error parsing Markdown with marked.parse():", e);
@@ -193,7 +182,7 @@ function addMessageToChat(messageObject, isTemporary = false) {
             preTag.textContent = text;
             messageDiv.appendChild(preTag);
         }
-    } else { // 用户消息或其他系统消息
+    } else { 
         const preTag = document.createElement('pre');
         preTag.textContent = text;
         messageDiv.appendChild(preTag);
@@ -225,7 +214,7 @@ function removeLastMessageFromChat() {
 
 function renderCurrentChat() {
     if (!chatOutput) return;
-    chatOutput.innerHTML = ''; // 清空
+    chatOutput.innerHTML = ''; 
     currentChat.forEach(msgObject => {
         addMessageToChat(msgObject);
     });
@@ -258,7 +247,7 @@ if (sendMessageButton) {
 
         if (!combinedTextForAPI.trim()) {
             console.log("Sidebar: No effective content to send.");
-            return; // 没有有效输入
+            return; 
         }
 
         const partsForAPI = [{ text: combinedTextForAPI }];
@@ -282,6 +271,17 @@ if (sendMessageButton) {
         clearSelectedTextPreview();
 
         await callGeminiAPI(partsForAPI, false);
+    });
+}
+
+// Add this new event listener for chatInput
+if (chatInput && sendMessageButton) {
+    chatInput.addEventListener('keydown', (event) => {
+        // Check for Command+Enter on macOS or Ctrl+Enter on Windows/Linux
+        if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault(); // Prevent default action (e.g., adding a new line in textarea)
+            sendMessageButton.click(); // Programmatically click the send button
+        }
     });
 }
 

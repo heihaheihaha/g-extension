@@ -5,7 +5,7 @@ body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column
 #chatOutput { flex-grow: 1; overflow-y: auto; margin-bottom: 10px; padding: 5px; border: 1px solid #eee; min-height: 100px;}
 .message { margin-bottom: 8px; padding: 6px; border-radius: 4px; }
 .message.user { background-color: #e1f5fe; text-align: right; margin-left: 20%; }
-.message.ai { background-color: #f0f0f0; margin-right: 20%; }
+.message.ai { background-color: #f0f0f0; /* Removed margin-right: 20%; */ }
 .message .timestamp { font-size: 0.7em; color: #777; display: block; }
 #selectedTextPreview { font-size: 0.9em; }
 #chatInput { width: calc(100% - 12px); min-height: 60px; margin-bottom: 5px; padding: 5px; }
