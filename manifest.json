@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "智能侧边栏助手 (Gemini)",
-  "version": "1.0",
-  "description": "使用Gemini API总结网页、进行智能对话，并支持中文。",
+  "name": "智能侧边栏助手",
+  "version": "1.1.0",
+  "description": "使用各类API总结网页、进行智能对话",
   "permissions": [
     "activeTab",
     "scripting",
