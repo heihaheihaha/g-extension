@@ -1,115 +1,213 @@
 // options.js
 document.addEventListener('DOMContentLoaded', function() {
+  const configIdInput = document.getElementById('configId');
+  const configNameInput = document.getElementById('configName');
   const apiKeyInput = document.getElementById('apiKey');
   const apiTypeSelect = document.getElementById('apiType');
   const apiEndpointInput = document.getElementById('apiEndpoint');
   const modelNameInput = document.getElementById('modelName');
-  const saveButton = document.getElementById('saveButton');
+  
+  const saveConfigButton = document.getElementById('saveConfigButton');
+  const clearFormButton = document.getElementById('clearFormButton');
+  const cancelEditButton = document.getElementById('cancelEditButton');
+  
+  const configurationsListDiv = document.getElementById('configurationsList');
   const statusDiv = document.getElementById('status');
+  
   const apiEndpointGroup = document.getElementById('apiEndpointGroup');
-  const modelNameGroup = document.getElementById('modelNameGroup');
 
-  // 根据API类型显示/隐藏特定字段
-  function toggleApiSpecificFields() {
-    const selectedType = apiTypeSelect.value;
-    if (selectedType === 'openai') {
-      apiEndpointGroup.style.display = 'block';
-      modelNameGroup.style.display = 'block'; // OpenAI usually requires a model name
-    } else if (selectedType === 'gemini') {
-      apiEndpointGroup.style.display = 'none'; // Gemini endpoint is fixed for this key type
-      modelNameGroup.style.display = 'block'; // Gemini also uses model names
+  let configurations = [];
+  let activeConfigurationId = null;
+
+  function generateId() {
+    return `config_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  }
+
+  function toggleApiEndpointField() {
+    if (apiTypeSelect.value === 'openai') {
+      apiEndpointGroup.classList.remove('hidden');
     } else {
-      apiEndpointGroup.style.display = 'none';
-      modelNameGroup.style.display = 'none';
+      apiEndpointGroup.classList.add('hidden');
+      apiEndpointInput.value = ''; // Clear if not applicable
     }
   }
 
-  apiTypeSelect.addEventListener('change', toggleApiSpecificFields);
+  apiTypeSelect.addEventListener('change', toggleApiEndpointField);
 
-  // 加载已保存的设置
-  chrome.storage.sync.get(['apiKey', 'apiType', 'apiEndpoint', 'modelName'], function(result) {
-    if (result.apiKey) {
-      apiKeyInput.value = result.apiKey;
-    }
-    if (result.apiType) {
-      apiTypeSelect.value = result.apiType;
-    }
-    if (result.apiEndpoint) {
-      apiEndpointInput.value = result.apiEndpoint;
-    }
-    if (result.modelName) {
-      modelNameInput.value = result.modelName;
-    }
-    toggleApiSpecificFields(); // 初始化时根据存储的值调整显示
-  });
+  async function loadConfigurations() {
+    const result = await chrome.storage.sync.get(['apiConfigurations', 'activeConfigurationId']);
+    configurations = result.apiConfigurations || [];
+    activeConfigurationId = result.activeConfigurationId || null;
+    renderConfigurations();
+  }
 
-  saveButton.addEventListener('click', function() {
+  async function saveConfigurations() {
+    try {
+      await chrome.storage.sync.set({ 
+        apiConfigurations: configurations,
+        activeConfigurationId: activeConfigurationId 
+      });
+      statusDiv.textContent = '操作成功！';
+      statusDiv.style.color = 'green';
+    } catch (e) {
+      statusDiv.textContent = '错误: 保存配置失败。 ' + e.message;
+      statusDiv.style.color = 'red';
+      console.error("Error saving configurations:", e);
+    }
+    setTimeout(() => { statusDiv.textContent = ''; }, 3000);
+  }
+
+  function renderConfigurations() {
+    configurationsListDiv.innerHTML = '';
+    if (configurations.length === 0) {
+      configurationsListDiv.innerHTML = '<p>暂无配置。请使用上面的表单添加一个新配置。</p>';
+      return;
+    }
+
+    configurations.forEach(config => {
+      const itemDiv = document.createElement('div');
+      itemDiv.classList.add('config-item');
+      if (config.id === activeConfigurationId) {
+        itemDiv.classList.add('is-active');
+      }
+
+      const detailsDiv = document.createElement('div');
+      detailsDiv.classList.add('config-details');
+      detailsDiv.innerHTML = `
+        <strong>${escapeHtml(config.configName)}</strong> ${config.id === activeConfigurationId ? '(当前活动)' : ''}<br>
+        <small>类型: ${escapeHtml(config.apiType)} | 模型: ${escapeHtml(config.modelName)}</small>
+      `;
+      itemDiv.appendChild(detailsDiv);
+
+      const actionsDiv = document.createElement('div');
+      actionsDiv.classList.add('config-actions');
+
+      const setActiveButton = document.createElement('button');
+      setActiveButton.textContent = '设为活动';
+      setActiveButton.classList.add('set-active-btn');
+      if (config.id === activeConfigurationId) {
+        setActiveButton.disabled = true;
+        setActiveButton.style.opacity = 0.5;
+      }
+      setActiveButton.addEventListener('click', async () => {
+        activeConfigurationId = config.id;
+        await saveConfigurations();
+        renderConfigurations(); // Re-render to update active status
+      });
+      actionsDiv.appendChild(setActiveButton);
+
+      const editButton = document.createElement('button');
+      editButton.textContent = '编辑';
+      editButton.classList.add('edit-btn');
+      editButton.addEventListener('click', () => populateFormForEdit(config));
+      actionsDiv.appendChild(editButton);
+
+      const deleteButton = document.createElement('button');
+      deleteButton.textContent = '删除';
+      deleteButton.classList.add('delete-btn');
+      deleteButton.addEventListener('click', async () => {
+        if (confirm(`确定要删除配置 "${escapeHtml(config.configName)}" 吗？`)) {
+          configurations = configurations.filter(c => c.id !== config.id);
+          if (activeConfigurationId === config.id) {
+            activeConfigurationId = configurations.length > 0 ? configurations[0].id : null;
+          }
+          await saveConfigurations();
+          loadConfigurations(); // Reload and re-render
+        }
+      });
+      actionsDiv.appendChild(deleteButton);
+      
+      itemDiv.appendChild(actionsDiv);
+      configurationsListDiv.appendChild(itemDiv);
+    });
+  }
+
+  function populateFormForEdit(config) {
+    configIdInput.value = config.id;
+    configNameInput.value = config.configName;
+    apiKeyInput.value = config.apiKey;
+    apiTypeSelect.value = config.apiType;
+    apiEndpointInput.value = config.apiEndpoint || '';
+    modelNameInput.value = config.modelName;
+    toggleApiEndpointField();
+    saveConfigButton.textContent = '更新配置';
+    cancelEditButton.classList.remove('hidden');
+    document.getElementById('configFormContainer').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function clearForm() {
+    configIdInput.value = '';
+    configNameInput.value = '';
+    apiKeyInput.value = '';
+    apiTypeSelect.value = 'gemini'; // Default
+    apiEndpointInput.value = '';
+    modelNameInput.value = '';
+    toggleApiEndpointField();
+    saveConfigButton.textContent = '保存配置';
+    cancelEditButton.classList.add('hidden');
+    configNameInput.focus();
+  }
+
+  clearFormButton.addEventListener('click', clearForm);
+  cancelEditButton.addEventListener('click', clearForm);
+
+  saveConfigButton.addEventListener('click', async () => {
+    const id = configIdInput.value;
+    const configName = configNameInput.value.trim();
     const apiKey = apiKeyInput.value.trim();
     const apiType = apiTypeSelect.value;
     const apiEndpoint = apiEndpointInput.value.trim();
     const modelName = modelNameInput.value.trim();
 
-    let settingsToSave = {};
-    let isValid = true;
-
-    if (apiKey) {
-      settingsToSave.apiKey = apiKey;
-    } else {
-      statusDiv.textContent = '请输入有效的API密钥。';
+    if (!configName || !apiKey || !modelName) {
+      statusDiv.textContent = '配置名称、API密钥和模型名称不能为空。';
       statusDiv.style.color = 'red';
-      isValid = false;
+      return;
+    }
+    if (apiType === 'openai' && !apiEndpoint) {
+      statusDiv.textContent = 'OpenAI 兼容 API 需要填写 Endpoint URL。';
+      statusDiv.style.color = 'red';
+      return;
     }
 
-    settingsToSave.apiType = apiType;
+    const newConfig = {
+      id: id || generateId(),
+      configName,
+      apiKey,
+      apiType,
+      apiEndpoint: apiType === 'openai' ? apiEndpoint : '',
+      modelName
+    };
 
-    if (apiType === 'openai') {
-      if (apiEndpoint && URL.canParse(apiEndpoint)) { // Basic URL validation
-        settingsToSave.apiEndpoint = apiEndpoint;
-      } else {
-        statusDiv.textContent = '请输入有效的 OpenAI API Endpoint URL。';
-        statusDiv.style.color = 'red';
-        isValid = false;
-      }
-      if (modelName) {
-        settingsToSave.modelName = modelName;
-      } else {
-        // Model name might be optional for some OpenAI compatible APIs if they have a default
-        // Or you can enforce it:
-        // statusDiv.textContent = '请输入 OpenAI 模型名称。';
-        // statusDiv.style.color = 'red';
-        // isValid = false;
-      }
-    } else if (apiType === 'gemini') {
-      if (modelName) {
-        settingsToSave.modelName = modelName;
-      } else {
-        statusDiv.textContent = '请输入 Gemini 模型名称。';
-        statusDiv.style.color = 'red';
-        isValid = false;
-      }
-      // apiEndpoint is not user-configurable for Gemini in this basic setup
-      settingsToSave.apiEndpoint = ''; // Clear it if not Gemini
+    const existingIndex = configurations.findIndex(c => c.id === newConfig.id);
+    if (existingIndex > -1) {
+      configurations[existingIndex] = newConfig; // Update existing
+    } else {
+      configurations.push(newConfig); // Add new
+    }
+    
+    // If this is the first configuration, or if we're updating the active one,
+    // or if no configuration is active, make this one active.
+    if (configurations.length === 1 || newConfig.id === activeConfigurationId || !activeConfigurationId) {
+        activeConfigurationId = newConfig.id;
     }
 
-    if (!modelName && (apiType === 'gemini' || apiType === 'openai')) { // General check for model name
-        statusDiv.textContent = '请输入模型名称。';
-        statusDiv.style.color = 'red';
-        isValid = false;
-    }
-
-
-    if (isValid) {
-      chrome.storage.sync.set(settingsToSave, function() {
-        if (chrome.runtime.lastError) {
-          statusDiv.textContent = '错误: 保存设置失败。 ' + chrome.runtime.lastError.message;
-          statusDiv.style.color = 'red';
-          console.error("Error saving settings:", chrome.runtime.lastError.message);
-        } else {
-          statusDiv.textContent = '设置已成功保存！';
-          statusDiv.style.color = 'green';
-          setTimeout(() => { statusDiv.textContent = ''; }, 3000);
-        }
-      });
-    }
+    await saveConfigurations();
+    clearForm();
+    loadConfigurations(); // Reload and re-render
   });
+
+  function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return '';
+    return unsafe
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
+  }
+
+  // Initial load
+  loadConfigurations();
+  toggleApiEndpointField(); // Set initial state of endpoint field
 });

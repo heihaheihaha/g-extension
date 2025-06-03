@@ -1,46 +1,84 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>智能侧边栏设置</title>
+  <title>智能侧边栏API设置</title>
   <meta charset="utf-8">
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: auto; }
-    label { display: block; margin-bottom: 8px; font-weight: bold; }
-    input[type="text"], input[type="url"], select { width: 100%; padding: 8px; margin-bottom: 15px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;}
-    button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    body { font-family: sans-serif; padding: 20px; max-width: 700px; margin: auto; font-size: 14px; }
+    h1, h2 { text-align: center; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input[type="text"], input[type="url"], select, textarea {
+      width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box;
+      border: 1px solid #ccc; border-radius: 4px; font-size: 1em;
+    }
+    button {
+      padding: 8px 12px; background-color: #007bff; color: white;
+      border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; font-size: 0.9em;
+    }
     button:hover { background-color: #0056b3; }
-    #status { margin-top: 15px; font-weight: bold; }
-    .form-group { margin-bottom: 15px; }
+    button.delete-btn { background-color: #dc3545; }
+    button.delete-btn:hover { background-color: #c82333; }
+    button.edit-btn { background-color: #ffc107; color: #212529; }
+    button.edit-btn:hover { background-color: #e0a800; }
+    button.set-active-btn { background-color: #28a745; }
+    button.set-active-btn:hover { background-color: #218838; }
+    #status { margin-top: 15px; font-weight: bold; text-align: center; }
+    .config-form, .config-list { margin-top: 20px; padding: 15px; border: 1px solid #eee; border-radius: 5px; background-color: #f9f9f9; }
+    .config-item {
+      padding: 10px; border-bottom: 1px solid #eee; display: flex;
+      justify-content: space-between; align-items: center;
+    }
+    .config-item:last-child { border-bottom: none; }
+    .config-details { flex-grow: 1; }
+    .config-actions button { margin-left: 5px; }
+    .is-active { font-weight: bold; color: #28a745; }
+    .form-group { margin-bottom: 10px; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <h1>设置</h1>
+  <h1>API 配置管理</h1>
 
-  <div class="form-group">
-    <label for="apiKey">API 密钥 (适用于所选API类型):</label>
-    <input type="text" id="apiKey" name="apiKey" placeholder="在此处粘贴您的 API 密钥">
-  </div>
-
-  <div class="form-group">
-    <label for="apiType">API 类型:</label>
-    <select id="apiType" name="apiType">
-      <option value="gemini">Google Gemini</option>
-      <option value="openai">OpenAI 兼容 API</option>
+  <div class="config-form" id="configFormContainer">
+    <h2>添加/编辑配置</h2>
+    <input type="hidden" id="configId">
+    <div class="form-group">
+      <label for="configName">配置名称:</label>
+      <input type="text" id="configName" placeholder="例如：我的 Gemini 主力">
+    </div>
+    <div class="form-group">
+      <label for="apiKey">API 密钥:</label>
+      <input type="text" id="apiKey" placeholder="粘贴您的 API 密钥">
+    </div>
+    <div class="form-group">
+      <label for="apiType">API 类型:</label>
+      <select id="apiType">
+        <option value="gemini">Google Gemini</option>
+        <option value="openai">OpenAI 兼容 API</option>
       </select>
+    </div>
+    <div class="form-group hidden" id="apiEndpointGroup">
+      <label for="apiEndpoint">API Endpoint URL:</label>
+      <input type="url" id="apiEndpoint" placeholder="例如: https://api.openai.com/v1/chat/completions">
+    </div>
+    <div class="form-group">
+      <label for="modelName">模型名称:</label>
+      <input type="text" id="modelName" placeholder="例如: gemini-1.5-flash-latest 或 gpt-4o">
+    </div>
+    <button id="saveConfigButton">保存配置</button>
+    <button type="button" id="clearFormButton">清空表单</button>
+    <button type="button" id="cancelEditButton" class="hidden">取消编辑</button>
   </div>
 
-  <div class="form-group" id="apiEndpointGroup">
-    <label for="apiEndpoint">API Endpoint URL (适用于 OpenAI 兼容 API):</label>
-    <input type="url" id="apiEndpoint" name="apiEndpoint" placeholder="例如: https://api.openai.com/v1/chat/completions">
+  <div class="config-list">
+    <h2>已保存的配置</h2>
+    <div id="configurationsList">
+      <p>暂无配置。请添加一个新配置。</p>
+    </div>
   </div>
-
-  <div class="form-group" id="modelNameGroup">
-    <label for="modelName">模型名称 (适用于所选API类型):</label>
-    <input type="text" id="modelName" name="modelName" placeholder="例如: gemini-1.5-flash-latest 或 gpt-3.5-turbo">
-  </div>
-
-  <button id="saveButton">保存设置</button>
+  
   <p id="status"></p>
+
   <script src="options.js"></script>
 </body>
 </html>

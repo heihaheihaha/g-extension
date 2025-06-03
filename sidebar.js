@@ -46,26 +46,43 @@ async function initialize() {
         console.warn("Marked Library Test - marked is not an object or marked.parse is not a function.");
     }
 
-    // Load API configurations
+    // Load active API configuration
     try {
-        const result = await chrome.storage.sync.get(['apiKey', 'apiType', 'apiEndpoint', 'modelName']);
-        currentApiKey = result.apiKey || null;
-        currentApiType = result.apiType || 'gemini';
-        currentApiEndpoint = result.apiEndpoint || '';
-        currentModelName = result.modelName || (currentApiType === 'gemini' ? 'gemini-1.5-flash-latest' : '');
+        const result = await chrome.storage.sync.get(['apiConfigurations', 'activeConfigurationId']); //
+        const configs = result.apiConfigurations || []; //
+        const activeId = result.activeConfigurationId; //
+        
+        let activeConfig = null;
+        if (activeId && configs.length > 0) {
+            activeConfig = configs.find(c => c.id === activeId); //
+        }
+        // If no activeId, or activeId not found, try to use the first available config
+        if (!activeConfig && configs.length > 0) {
+            activeConfig = configs[0]; //
+            // Optionally, save this as the new activeConfigurationId
+            // await chrome.storage.sync.set({ activeConfigurationId: activeConfig.id });
+            console.warn("No active configuration found or ID mismatch, defaulting to the first available configuration.");
+        }
 
-
-        if (!currentApiKey) {
-            addMessageToChat({ role: 'model', parts: [{text: '错误：API 密钥未设置。请在插件选项中设置。'}], timestamp: Date.now() });
-            disableInputs();
-        } else if (!currentModelName) {
-            addMessageToChat({ role: 'model', parts: [{text: `错误：${currentApiType === 'gemini' ? 'Gemini' : 'OpenAI'} 模型名称未设置。请在插件选项中设置。`}], timestamp: Date.now() });
-            disableInputs();
-        } else if (currentApiType === 'openai' && !currentApiEndpoint) {
-            addMessageToChat({ role: 'model', parts: [{text: '错误：OpenAI API Endpoint 未设置。请在插件选项中设置。'}], timestamp: Date.now() });
-            disableInputs();
+        if (activeConfig) {
+            currentApiKey = activeConfig.apiKey; //
+            currentApiType = activeConfig.apiType; //
+            currentApiEndpoint = activeConfig.apiEndpoint || ''; // Ensure empty string if undefined //
+            currentModelName = activeConfig.modelName; //
+            
+            // Basic validation of the loaded active config
+            if (!currentApiKey || !currentModelName || (currentApiType === 'openai' && !currentApiEndpoint)) {
+                 addMessageToChat({ role: 'model', parts: [{text: '错误：当前活动的API配置不完整。请检查插件选项。'}], timestamp: Date.now() }); //
+                 disableInputs(); //
+            } else {
+                // Add a temporary status message that will be removed.
+                const tempStatusMsg = addMessageToChat({ role: 'model', parts: [{text: `已加载配置: "${activeConfig.configName}" (${activeConfig.apiType})`}], timestamp: Date.now(), isTempStatus: true }); //
+                setTimeout(() => removeMessageByContentCheck(msg => msg.isTempStatus && msg.timestamp === tempStatusMsg.timestamp && msg.parts[0].text.includes("已加载配置")), 3000);
+                enableInputs(); //
+            }
         } else {
-            enableInputs(); // Enable if basic config seems present
+            addMessageToChat({ role: 'model', parts: [{text: '错误：未找到任何API配置或未设置活动配置。请在插件选项中添加并设置一个活动配置。'}], timestamp: Date.now() }); //
+            disableInputs(); //
         }
 
     } catch (e) {
@@ -74,9 +91,9 @@ async function initialize() {
         disableInputs();
     }
 
-    await loadArchivedChats();
-    loadChatHistory(); // This now loads history and potentially sets currentChat
-    await loadPromptTemplates();
+    await loadArchivedChats(); //
+    loadChatHistory(); // This now loads history and potentially sets currentChat //
+    await loadPromptTemplates(); //
 
     // If currentChat is still empty after loadChatHistory (e.g. first run or all history cleared)
     if (!currentChat || currentChat.length === 0) {
@@ -84,104 +101,106 @@ async function initialize() {
     }
 
 
-    if (sendMessageButton) sendMessageButton.addEventListener('click', handleSendMessage);
+    if (sendMessageButton) sendMessageButton.addEventListener('click', handleSendMessage); //
 
     if (chatInput && sendMessageButton) {
-        chatInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault(); sendMessageButton.click();
+        chatInput.addEventListener('keydown', (event) => { //
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { //
+                event.preventDefault(); sendMessageButton.click(); //
             }
         });
     }
 
-    if (summarizePageButton) summarizePageButton.addEventListener('click', handleSummarizeCurrentPage);
-    if (clearSelectedTextButton) clearSelectedTextButton.addEventListener('click', clearSelectedTextPreview);
-    if (clearSelectedImageButton) clearSelectedImageButton.addEventListener('click', clearSelectedImagePreview);
+    if (summarizePageButton) summarizePageButton.addEventListener('click', handleSummarizeCurrentPage); //
+    if (clearSelectedTextButton) clearSelectedTextButton.addEventListener('click', clearSelectedTextPreview); //
+    if (clearSelectedImageButton) clearSelectedImageButton.addEventListener('click', clearSelectedImagePreview); //
 
 
     if (clearAllHistoryButton) {
-        clearAllHistoryButton.addEventListener('click', () => {
-            if (confirm("确定要清除所有对话历史吗？此操作无法撤销。")) {
-                allChats = [];
-                currentChat = [];
-                saveChatHistory(); // This will save empty allChats
+        clearAllHistoryButton.addEventListener('click', () => { //
+            if (confirm("确定要清除所有对话历史吗？此操作无法撤销。")) { //
+                allChats = []; //
+                currentChat = []; //
+                saveChatHistory(); // This will save empty allChats //
                 // renderChatHistoryList(); // No longer needed as list display is removed
-                renderCurrentChat(); // Clears the current chat display
-                addMessageToChat({ role: 'model', parts: [{text: '所有对话历史已清除。'}], timestamp: Date.now() });
+                renderCurrentChat(); // Clears the current chat display //
+                addMessageToChat({ role: 'model', parts: [{text: '所有对话历史已清除。'}], timestamp: Date.now() }); //
             }
         });
     }
 
-    if (splitChatButton) splitChatButton.addEventListener('click', handleSplitChat);
+    if (splitChatButton) splitChatButton.addEventListener('click', handleSplitChat); //
     if (viewArchivedChatsButton) {
-        viewArchivedChatsButton.addEventListener('click', () => {
-            chrome.tabs.create({ url: chrome.runtime.getURL('archive.html') });
+        viewArchivedChatsButton.addEventListener('click', () => { //
+            chrome.tabs.create({ url: chrome.runtime.getURL('archive.html') }); //
         });
     }
     if (managePromptsButton) {
-        managePromptsButton.addEventListener('click', () => {
-            chrome.tabs.create({ url: chrome.runtime.getURL('prompts.html') });
+        managePromptsButton.addEventListener('click', () => { //
+            chrome.tabs.create({ url: chrome.runtime.getURL('prompts.html') }); //
         });
     }
 
 
-    chrome.storage.onChanged.addListener(async (changes, namespace) => {
-        if (namespace === 'sync') {
-            let configChanged = false;
-            if (changes.apiKey) {
-                currentApiKey = changes.apiKey.newValue;
-                configChanged = true;
-            }
-            if (changes.apiType) {
-                currentApiType = changes.apiType.newValue;
-                // If API type changes, model name might need to be re-evaluated or cleared if not compatible
-                if (!changes.modelName) { // if modelName wasn't also changed in this event
-                    currentModelName = (currentApiType === 'gemini') ? 'gemini-1.5-flash-latest' : '';
-                }
-                configChanged = true;
-            }
-            if (changes.apiEndpoint) {
-                currentApiEndpoint = changes.apiEndpoint.newValue;
-                configChanged = true;
-            }
-            if (changes.modelName) {
-                currentModelName = changes.modelName.newValue;
-                configChanged = true;
-            }
+    chrome.storage.onChanged.addListener(async (changes, namespace) => { //
+        if (namespace === 'sync' && (changes.apiConfigurations || changes.activeConfigurationId)) { //
+            // Reload configurations if either the list or the active ID changes
+            const result = await chrome.storage.sync.get(['apiConfigurations', 'activeConfigurationId']); //
+            const configs = result.apiConfigurations || []; //
+            const activeId = result.activeConfigurationId; //
+            let activeConfig = null;
 
-            if (configChanged) {
-                addMessageToChat({ role: 'model', parts: [{text: 'API 配置已更新。'}], timestamp: Date.now() });
-                // Re-validate inputs
-                if (!currentApiKey) {
-                    addMessageToChat({ role: 'model', parts: [{text: '错误：API 密钥未设置。'}], timestamp: Date.now() });
-                    disableInputs();
-                } else if (!currentModelName) {
-                    addMessageToChat({ role: 'model', parts: [{text: `错误：模型名称未设置。`}], timestamp: Date.now() });
-                    disableInputs();
-                } else if (currentApiType === 'openai' && !currentApiEndpoint) {
-                    addMessageToChat({ role: 'model', parts: [{text: '错误：OpenAI API Endpoint 未设置。'}], timestamp: Date.now() });
-                    disableInputs();
-                } else {
-                    enableInputs();
-                }
+            if (activeId && configs.length > 0) {
+                activeConfig = configs.find(c => c.id === activeId); //
             }
+            if (!activeConfig && configs.length > 0) { // Fallback to first if activeId is somehow invalid
+                 activeConfig = configs[0]; //
+                 console.warn("Active configuration ID not found in list after change, defaulting to first available.");
+                 // Optionally, update activeConfigurationId in storage here if you want to auto-correct
+                 // await chrome.storage.sync.set({ activeConfigurationId: activeConfig.id });
+            }
+            
+            let configStatusMessage = 'API 配置已更新。';
+            if (activeConfig) {
+                currentApiKey = activeConfig.apiKey; //
+                currentApiType = activeConfig.apiType; //
+                currentApiEndpoint = activeConfig.apiEndpoint || ''; //
+                currentModelName = activeConfig.modelName; //
+                configStatusMessage = `已切换到配置: "${activeConfig.configName}" (${activeConfig.apiType})`;
+
+                // Re-validate and enable/disable inputs
+                if (!currentApiKey || !currentModelName || (currentApiType === 'openai' && !currentApiEndpoint)) { //
+                    addMessageToChat({ role: 'model', parts: [{text: '错误：新的活动API配置不完整。请检查插件选项。'}], timestamp: Date.now() }); //
+                    disableInputs(); //
+                } else {
+                    enableInputs(); //
+                }
+            } else { // No active config could be determined
+                currentApiKey = null; //
+                currentApiType = 'gemini'; // Reset to default or keep previous
+                currentApiEndpoint = '';
+                currentModelName = '';
+                configStatusMessage = '未找到有效的活动API配置。请在选项中设置。';
+                disableInputs(); //
+            }
+             addMessageToChat({ role: 'model', parts: [{text: configStatusMessage}], timestamp: Date.now() }); //
         }
-        if (namespace === 'local') {
-            if (changes.geminiChatHistory) {
-                // Ensure allChats is updated correctly
-                allChats = (changes.geminiChatHistory.newValue || []).map(chat => chat.filter(msg => !msg.isTempStatus && !msg.isThinking));
+        // --- Existing local storage listeners ---
+        if (namespace === 'local') { //
+            if (changes.geminiChatHistory) { //
+                allChats = (changes.geminiChatHistory.newValue || []).map(chat => chat.filter(msg => !msg.isTempStatus && !msg.isThinking)); //
                 // renderChatHistoryList(); // No longer needed
             }
-            if (changes.geminiArchivedChats) {
-                archivedChats = changes.geminiArchivedChats.newValue || [];
-                updateArchivedChatsButtonCount();
+            if (changes.geminiArchivedChats) { //
+                archivedChats = changes.geminiArchivedChats.newValue || []; //
+                updateArchivedChatsButtonCount(); //
             }
-            if (changes.promptTemplates) {
-                await loadPromptTemplates(); // This will re-render shortcuts
+            if (changes.promptTemplates) { //
+                await loadPromptTemplates(); // This will re-render shortcuts //
             }
         }
     });
-    chrome.runtime.onMessage.addListener(handleRuntimeMessages);
+    chrome.runtime.onMessage.addListener(handleRuntimeMessages); //
 }
 
 async function loadPromptTemplates() {
