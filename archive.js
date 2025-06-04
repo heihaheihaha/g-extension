@@ -1,8 +1,40 @@
 // g-extension/archive.js
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     const archivedChatsListDiv = document.getElementById('archivedChatsList');
     const clearAllArchivedButton = document.getElementById('clearAllArchivedButton');
-    let archivedChats = []; // This will be populated from storage
+    let archivedChats = []; 
+    let currentLang = 'zh';
+
+    async function initArchive() {
+        currentLang = await getActiveLanguage();
+        await applyPageLocalization();
+        await loadArchivedChats();
+        setupEventListeners();
+    }
+
+    function setupEventListeners() {
+        if (clearAllArchivedButton) {
+            clearAllArchivedButton.addEventListener('click', async () => {
+                if (confirm(await getL10nString('confirmClearAllArchived'))) {
+                    archivedChats = [];
+                    saveArchivedChatsToStorage();
+                    await renderArchivedChats(); 
+                }
+            });
+        }
+         // Listener for language changes
+        chrome.storage.onChanged.addListener(async (changes, namespace) => {
+            if (namespace === 'sync' && changes.language) {
+                currentLang = changes.language.newValue || 'zh';
+                await applyPageLocalization();
+                await renderArchivedChats(); // Re-render with new language for dates, etc.
+            }
+             if (namespace === 'local' && changes.geminiArchivedChats) { // Keep existing listener
+                archivedChats = changes.geminiArchivedChats.newValue || [];
+                await renderArchivedChats();
+            }
+        });
+    }
 
     function escapeHtml(unsafe) {
         if (typeof unsafe !== 'string') return '';
@@ -14,43 +46,54 @@ document.addEventListener('DOMContentLoaded', function() {
             .replace(/'/g, "&#039;");
     }
 
-    function renderArchivedChats() {
+    async function renderArchivedChats() {
         if (!archivedChatsListDiv) return;
         archivedChatsListDiv.innerHTML = '';
+        currentLang = await getActiveLanguage(); // Ensure lang is current for display
 
         if (archivedChats.length === 0) {
-            archivedChatsListDiv.innerHTML = '<p>没有已存档的对话。</p>';
+            archivedChatsListDiv.innerHTML = `<p>${await getL10nString('noArchivedChats')}</p>`;
             return;
         }
 
-        // Sort by the timestamp of the first message in each archived chat/pair, newest first
         const sortedArchivedChats = [...archivedChats].sort((a, b) => {
             const tsA = a[0]?.timestamp || 0;
             const tsB = b[0]?.timestamp || 0;
             return tsB - tsA;
         });
 
+        const deleteButtonText = await getL10nString('deleteFromArchiveButton');
+        const roleYouText = await getL10nString('roleYou');
+        const roleAiText = await getL10nString('roleAi');
 
-        sortedArchivedChats.forEach((chat, index) => { // Use sortedArchivedChats
-            if (!chat || chat.length === 0) return;
+
+        for (let index = 0; index < sortedArchivedChats.length; index++) {
+            const chat = sortedArchivedChats[index];
+            if (!chat || chat.length === 0) continue;
 
             const chatContainer = document.createElement('div');
             chatContainer.classList.add('archived-chat-item');
 
-            let titleText = `存档 ${index + 1}`;
+            let titleTextKey = 'archiveChatItemTitle';
+            let titleArg = String(index + 1);
+
             const firstUserMsg = chat.find(msg => msg.role === 'user' && msg.parts && msg.parts[0] && msg.parts[0].text);
             const firstModelMsg = chat.find(msg => msg.role === 'model' && msg.parts && msg.parts[0] && msg.parts[0].text);
 
-            if (chat.length === 2 && firstUserMsg && firstModelMsg) { // Likely a Q&A pair
-                titleText = `问答: ${firstUserMsg.parts[0].text.substring(0, 40)}...`;
+            if (chat.length === 2 && firstUserMsg && firstModelMsg) { 
+                titleTextKey = 'archiveChatItemQATitle';
+                titleArg = firstUserMsg.parts[0].text.substring(0, 40);
             } else if (firstUserMsg) {
-                titleText = `对话始于: ${firstUserMsg.parts[0].text.substring(0, 40)}...`;
+                titleTextKey = 'archiveChatItemConvTitle';
+                titleArg = firstUserMsg.parts[0].text.substring(0, 40);
             } else if (firstModelMsg) {
-                 titleText = `对话始于 (AI): ${firstModelMsg.parts[0].text.substring(0, 30)}...`;
+                titleTextKey = 'archiveChatItemConvAiTitle';
+                titleArg = firstModelMsg.parts[0].text.substring(0, 30);
             } else if (chat[0] && chat[0].parts && chat[0].parts[0] && chat[0].parts[0].text) {
-                titleText = (chat[0].role === 'user' ? "User: " : "AI: ") + chat[0].parts[0].text.substring(0,40) + (chat[0].parts[0].text.length > 40 ? "..." : "");
+                titleTextKey = chat[0].role === 'user' ? 'archiveChatItemConvTitle' : 'archiveChatItemConvAiTitle';
+                titleArg = chat[0].parts[0].text.substring(0,40);
             }
-
+            const titleText = await getL10nString(titleTextKey, titleArg);
 
             const titleHeader = document.createElement('h3');
             titleHeader.textContent = titleText;
@@ -60,13 +103,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 contentDiv.style.display = contentDiv.style.display === 'none' ? 'block' : 'none';
             });
             chatContainer.appendChild(titleHeader);
-            
+
             const archiveDateSpan = document.createElement('span');
             archiveDateSpan.classList.add('archive-date');
-            // Use timestamp of the first message in the archived item
-            archiveDateSpan.textContent = `存档于: ${new Date(chat[0]?.timestamp || Date.now()).toLocaleDateString()}`;
+            const dateToFormat = new Date(chat[0]?.timestamp || Date.now());
+            const formattedDate = dateToFormat.toLocaleDateString(currentLang === 'en' ? 'en-US' : 'zh-CN');
+            archiveDateSpan.textContent = await getL10nString('archiveDateLabel', formattedDate);
             chatContainer.appendChild(archiveDateSpan);
-
 
             const chatContentDiv = document.createElement('div');
             chatContentDiv.classList.add('archived-chat-content');
@@ -75,72 +118,47 @@ document.addEventListener('DOMContentLoaded', function() {
             chat.forEach(msg => {
                 const messageDiv = document.createElement('div');
                 messageDiv.classList.add('message', msg.role === 'user' ? 'user-message' : 'ai-message');
-                
-                let contentHtml = "内容不可用";
+
+                let contentHtml = "Content unavailable"; // Fallback
                 if (msg.parts && msg.parts[0] && typeof msg.parts[0].text === 'string') {
-                     // Can use marked.js here if desired, for consistency
-                     // For now, simple escaped HTML:
                      contentHtml = escapeHtml(msg.parts[0].text).replace(/\n/g, '<br>');
                 }
-                messageDiv.innerHTML = `<strong>${msg.role === 'user' ? 'You' : 'AI'} (${new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}):</strong><div class="msg-text-content">${contentHtml}</div>`;
-                
+                const roleDisplayName = msg.role === 'user' ? roleYouText : roleAiText;
+                const timeToFormat = new Date(msg.timestamp).toLocaleTimeString(currentLang === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit' });
+                messageDiv.innerHTML = `<strong><span class="math-inline">\{roleDisplayName\} \(</span>{timeToFormat}):</strong><div class="msg-text-content">${contentHtml}</div>`;
+
                 chatContentDiv.appendChild(messageDiv);
             });
             chatContainer.appendChild(chatContentDiv);
-            
+
             const deleteButton = document.createElement('button');
-            deleteButton.textContent = '从此存档中删除';
+            deleteButton.textContent = deleteButtonText;
             deleteButton.classList.add('delete-archive-btn');
-            deleteButton.onclick = (e) => {
-                e.stopPropagation(); // Prevent title click event
-                if (confirm(`确定要从存档中删除这个对话 ("${titleText}") 吗？此操作无法撤销。`)) {
-                    // Find the original index in 'archivedChats' before sorting for deletion
+            deleteButton.onclick = async (e) => {
+                e.stopPropagation(); 
+                if (confirm(await getL10nString('confirmDeleteArchiveItem', titleText))) {
                     const originalIndex = archivedChats.findIndex(originalChat => originalChat === chat);
                     if (originalIndex !== -1) {
                         archivedChats.splice(originalIndex, 1);
-                        saveArchivedChats(); // This will trigger re-render via storage listener or call render directly
-                        renderArchivedChats(); // Immediate re-render
+                        saveArchivedChatsToStorage(); 
+                        await renderArchivedChats(); 
                     }
                 }
             };
             chatContainer.appendChild(deleteButton);
-
             archivedChatsListDiv.appendChild(chatContainer);
-        });
-    }
-
-    function loadArchivedChats() {
-        chrome.storage.local.get(['geminiArchivedChats'], (result) => {
-            if (result.geminiArchivedChats) {
-                archivedChats = result.geminiArchivedChats;
-            } else {
-                archivedChats = [];
-            }
-            renderArchivedChats();
-        });
-    }
-
-    function saveArchivedChats() {
-        chrome.storage.local.set({ 'geminiArchivedChats': archivedChats });
-        // The onChanged listener in this script will handle re-rendering if open.
-    }
-
-    if (clearAllArchivedButton) {
-        clearAllArchivedButton.addEventListener('click', () => {
-            if (confirm("确定要永久删除所有已存档的对话吗？此操作无法撤销。")) {
-                archivedChats = [];
-                saveArchivedChats();
-                renderArchivedChats(); // Immediate re-render
-            }
-        });
-    }
-    
-    chrome.storage.onChanged.addListener((changes, namespace) => {
-        if (namespace === 'local' && changes.geminiArchivedChats) {
-            archivedChats = changes.geminiArchivedChats.newValue || [];
-            renderArchivedChats();
         }
-    });
+    }
 
-    loadArchivedChats();
+    async function loadArchivedChats() {
+        const result = await chrome.storage.local.get(['geminiArchivedChats']);
+        archivedChats = result.geminiArchivedChats || [];
+        await renderArchivedChats();
+    }
+
+    function saveArchivedChatsToStorage() {
+        chrome.storage.local.set({ 'geminiArchivedChats': archivedChats });
+    }
+
+    initArchive();
 });

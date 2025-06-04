@@ -1,5 +1,5 @@
 // g-extension/prompts.js
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const promptListDiv = document.getElementById('promptList');
   const promptIdInput = document.getElementById('promptId');
   const promptNameInput = document.getElementById('promptName');
@@ -9,94 +9,118 @@ document.addEventListener('DOMContentLoaded', () => {
   const backToSidebarButton = document.getElementById('backToSidebarButton');
 
   let prompts = [];
+  let currentLang = 'zh';
 
-  // Renamed to avoid conflict in scope, and defined as 'const'
-  const presetPromptsDefinition = [
-    {
-      id: 'preset-translate',
-      name: '翻译 (Translate)',
-      content: '请将以下文本翻译成[在此处填写目标语言，例如：英文]：\n\n{{text}}',
-      isPreset: true // This property is intrinsic to definition
-    },
-    {
-      id: 'preset-summarize',
-      name: '总结 (Summarize)',
-      content: '请总结以下文本的主要内容：\n\n{{text}}',
-      isPreset: true // This property is intrinsic to definition
-    }
-  ];
+  async function initializePrompts() {
+    currentLang = await getActiveLanguage(); // from translations.js
+    await applyPageLocalization(); // from translations.js
+    await loadPrompts();
+    setupEventListeners();
+  }
+
+  function setupEventListeners() {
+    savePromptButton.addEventListener('click', handleSavePrompt);
+    clearFormButton.addEventListener('click', clearForm);
+    backToSidebarButton.addEventListener('click', () => {
+      chrome.tabs.getCurrent(tab => {
+          if (tab && tab.id) {
+              chrome.tabs.remove(tab.id);
+          } else {
+              window.close(); 
+          }
+      });
+    });
+  }
+
+  // Define presets with multi-language support
+  async function getPresetDefinitions() {
+    // Fetch localized names/content for presets
+    // This ensures that if a preset is added because it's missing,
+    // it gets added with the current UI language.
+    return [
+      {
+        id: 'preset-translate',
+        names: { en: await getL10nString('presetTranslateName'), zh: await getL10nString('presetTranslateName') }, // Use same key for both
+        contents: { en: await getL10nString('presetTranslateContent'), zh: await getL10nString('presetTranslateContent') },
+        isPreset: true
+      },
+      {
+        id: 'preset-summarize',
+        names: { en: await getL10nString('presetSummarizeName'), zh: await getL10nString('presetSummarizeName') },
+        contents: { en: await getL10nString('presetSummarizeContent'), zh: await getL10nString('presetSummarizeContent') },
+        isPreset: true
+      }
+    ];
+  }
+
 
   async function loadPrompts() {
     const result = await chrome.storage.local.get(['promptTemplates']);
-    // Start with prompts from storage, or an empty array if none.
     prompts = result.promptTemplates ? [...result.promptTemplates] : [];
+    currentLang = await getActiveLanguage(); // Ensure currentLang is fresh
 
     let madeChangesToStoredStructure = false;
+    const presetPromptsDefinition = await getPresetDefinitions();
 
-    // Ensure preset definitions are present and correctly flagged.
-    // User's edits to name/content of presets already in 'prompts' will be preserved.
     presetPromptsDefinition.forEach(definedPreset => {
         const existingPromptIndex = prompts.findIndex(p => p.id === definedPreset.id);
 
         if (existingPromptIndex === -1) {
-            // Preset is missing, add it from definition.
-            // Add to the beginning of the array for consistent order of presets.
-            prompts.unshift({ ...definedPreset });
+            prompts.unshift({ 
+                id: definedPreset.id,
+                // When adding a NEW preset, use the name/content for the CURRENT language
+                name: definedPreset.names[currentLang] || definedPreset.names.en, 
+                content: definedPreset.contents[currentLang] || definedPreset.contents.en,
+                isPreset: true 
+            });
             madeChangesToStoredStructure = true;
         } else {
             // Preset exists, ensure its 'isPreset' flag is true.
-            // User's edited name and content are already loaded from storage.
+            // User's edited name and content are preserved.
             if (prompts[existingPromptIndex].isPreset !== true) {
                 prompts[existingPromptIndex].isPreset = true;
                 madeChangesToStoredStructure = true;
             }
-            // Optional: If you want the hardcoded preset *name* to always override user's name changes for presets,
-            // while keeping their content edits, you could do:
-            // if (prompts[existingPromptIndex].name !== definedPreset.name) {
-            //    prompts[existingPromptIndex].name = definedPreset.name;
-            //    madeChangesToStoredStructure = true;
-            // }
-            // However, to allow users to fully edit presets (name and content), we don't override here.
+            // Optional: If you want to allow resetting preset name/content to default
+            // you could add logic here. For now, user edits are kept.
         }
     });
 
-    // Ensure any non-preset prompts (custom ones) have isPreset: false
     prompts.forEach(p => {
-        // Check if this prompt ID exists in our hardcoded preset definitions
         const isActuallyPreset = presetPromptsDefinition.some(dp => dp.id === p.id);
-        if (!isActuallyPreset) { // If it's not in our definitions, it must be custom
-            if (p.isPreset !== false) { // if it's undefined or somehow true
+        if (!isActuallyPreset) { 
+            if (p.isPreset !== false) { 
                 p.isPreset = false;
                 madeChangesToStoredStructure = true;
             }
         }
     });
 
-    // If storage was initially empty or structural changes were made (like adding missing presets or correcting flags), save.
     if (!result.promptTemplates || madeChangesToStoredStructure) {
-        await savePrompts();
+        await savePromptsToStorage();
     }
-
-    renderPrompts();
+    await renderPrompts();
   }
 
-  async function savePrompts() {
-    // Ensure prompts are sorted so presets appear first, then custom prompts
+  async function savePromptsToStorage() {
     prompts.sort((a, b) => {
         if (a.isPreset && !b.isPreset) return -1;
         if (!a.isPreset && b.isPreset) return 1;
-        // Optional: sort by name or id if both are same type
         return 0;
     });
     await chrome.storage.local.set({ promptTemplates: prompts });
   }
 
-  function renderPrompts() {
+  async function renderPrompts() {
     promptListDiv.innerHTML = '';
     if (prompts.length === 0) {
-      promptListDiv.innerHTML = '<p>还没有模板，请添加一个。</p>';
+      promptListDiv.innerHTML = `<p>${await getL10nString('noPromptsYet')}</p>`;
       return;
     }
+
+    const presetTagText = await getL10nString('presetTagText');
+    const editButtonText = await getL10nString('editButton');
+    const deleteButtonText = await getL10nString('deleteButton');
 
     prompts.forEach(prompt => {
       const itemDiv = document.createElement('div');
@@ -108,11 +132,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const nameSpan = document.createElement('span');
       nameSpan.classList.add('prompt-item-name');
-      nameSpan.textContent = prompt.name;
+      nameSpan.textContent = prompt.name; 
       if (prompt.isPreset) {
         const presetTag = document.createElement('span');
         presetTag.classList.add('preset-tag');
-        presetTag.textContent = '预设';
+        presetTag.textContent = presetTagText;
         nameSpan.appendChild(presetTag);
       }
       headerDiv.appendChild(nameSpan);
@@ -120,18 +144,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const actionsDiv = document.createElement('div');
       actionsDiv.classList.add('prompt-item-actions');
 
-      const editButton = document.createElement('button');
-      editButton.classList.add('edit-button');
-      editButton.textContent = '编辑';
-      editButton.addEventListener('click', () => loadPromptForEditing(prompt.id));
-      actionsDiv.appendChild(editButton);
+      const editButtonElement = document.createElement('button');
+      editButtonElement.classList.add('edit-button');
+      editButtonElement.textContent = editButtonText;
+      editButtonElement.addEventListener('click', () => loadPromptForEditing(prompt.id));
+      actionsDiv.appendChild(editButtonElement);
 
       if (!prompt.isPreset) {
-        const deleteButton = document.createElement('button');
-        deleteButton.classList.add('delete-button');
-        deleteButton.textContent = '删除';
-        deleteButton.addEventListener('click', () => deletePrompt(prompt.id));
-        actionsDiv.appendChild(deleteButton);
+        const deleteButtonElement = document.createElement('button');
+        deleteButtonElement.classList.add('delete-button');
+        deleteButtonElement.textContent = deleteButtonText;
+        deleteButtonElement.addEventListener('click', () => deletePrompt(prompt.id));
+        actionsDiv.appendChild(deleteButtonElement);
       }
       headerDiv.appendChild(actionsDiv);
       itemDiv.appendChild(headerDiv);
@@ -158,64 +182,60 @@ document.addEventListener('DOMContentLoaded', () => {
       promptIdInput.value = prompt.id;
       promptNameInput.value = prompt.name;
       promptContentInput.value = prompt.content;
+      // If it's a preset, the name and content fields become editable.
+      // User changes are saved. The 'isPreset' flag is not changed by user.
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
       promptNameInput.focus();
     }
   }
 
   async function deletePrompt(id) {
-    if (confirm('确定要删除这个模板吗？')) {
+    if (confirm(await getL10nString('confirmDeletePrompt'))) {
       prompts = prompts.filter(p => p.id !== id);
-      await savePrompts();
-      renderPrompts();
-      clearForm(); // In case the deleted one was loaded in form
+      await savePromptsToStorage();
+      await renderPrompts();
+      clearForm(); 
     }
   }
 
-  savePromptButton.addEventListener('click', async () => {
+  async function handleSavePrompt() {
     const id = promptIdInput.value;
     const name = promptNameInput.value.trim();
     const content = promptContentInput.value.trim();
 
     if (!name || !content) {
-      alert('模板名称和内容不能为空。');
+      alert(await getL10nString('alertPromptNameContentMissing'));
       return;
     }
 
-    if (id) { // Editing existing
+    if (id) { 
       const promptIndex = prompts.findIndex(p => p.id === id);
       if (promptIndex !== -1) {
         prompts[promptIndex].name = name;
         prompts[promptIndex].content = content;
-        // prompts[promptIndex].isPreset is preserved.
+        // isPreset flag is preserved
       }
-    } else { // Adding new
+    } else { 
       prompts.push({
         id: `custom-${Date.now()}`,
         name,
         content,
-        isPreset: false // New prompts are always custom, not presets
+        isPreset: false 
       });
     }
-    await savePrompts();
-    renderPrompts();
+    await savePromptsToStorage();
+    await renderPrompts();
     clearForm();
+  }
+
+  // Listener for language changes from other parts of the extension (e.g., options page)
+  chrome.storage.onChanged.addListener(async (changes, namespace) => {
+    if (namespace === 'sync' && changes.language) {
+        currentLang = changes.language.newValue || 'zh';
+        await applyPageLocalization();
+        await loadPrompts(); // Reload prompts, definitions might change language
+    }
   });
 
-  clearFormButton.addEventListener('click', clearForm);
-
-  backToSidebarButton.addEventListener('click', () => {
-    // This page is likely opened in a new tab from the sidebar.
-    // Attempt to close it. If it wasn't, this might not work or might close an unintended tab.
-    // A more robust method would involve checking if it *can* be closed or messaging.
-    chrome.tabs.getCurrent(tab => {
-        if (tab && tab.id) {
-            chrome.tabs.remove(tab.id);
-        } else {
-            window.close(); // Fallback for environments where chrome.tabs.getCurrent might not work as expected
-        }
-    });
-  });
-
-  loadPrompts();
+  initializePrompts();
 });

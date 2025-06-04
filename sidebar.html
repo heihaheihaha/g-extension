@@ -1,21 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>智能助手</title>
-  <meta charset="utf-8">
+  <title>智能助手</title> <meta charset="utf-8">
   <link rel="stylesheet" href="sidebar.css">
 </head>
-<body>
+<body data-i18n-page-title-key="sidebarHtmlTitle">
   <div class="sidebar-container">
     <div class="controls">
-      <button id="summarizePageButton">总结当前网页 (中文)</button>
-      <button id="splitChatButton">分割当前对话</button>
-      <button id="viewArchivedChatsButton">查看已存档对话</button>
-      <button id="managePromptsButton">管理 Prompt</button>
+      <button id="summarizePageButton" data-i18n-key="summarizePageButton">总结当前网页 (中文)</button>
+      <button id="splitChatButton" data-i18n-key="splitChatButton">分割当前对话</button>
+      <button id="viewArchivedChatsButton" data-i18n-key="viewArchivedButton" data-i18n-args-count="0">查看已存档对话</button> <button id="managePromptsButton" data-i18n-key="managePromptsButton">管理 Prompt</button>
     </div>
 
     <div class="prompt-shortcuts-container">
-      <h4>Prompt 快捷方式:</h4>
+      <h4 data-i18n-key="promptShortcutsTitle">Prompt 快捷方式:</h4>
       <div id="promptShortcuts" class="prompt-shortcuts">
         </div>
     </div>
@@ -26,23 +24,24 @@
 
       <div id="selectedImagePreviewContainer" style="display:none; margin-bottom: 5px; text-align: center;">
         </div>
-      <button id="clearSelectedImageButton" style="display: none; margin: 0 auto 8px auto; font-size: 0.8em; padding: 3px 8px; display:block; width: fit-content; background-color: var(--control-button-bg); color: var(--control-button-text); border: none; border-radius: var(--border-radius); cursor:pointer;">清除图片</button>
+      <button id="clearSelectedImageButton" style="display: none; margin: 0 auto 8px auto; font-size: 0.8em; padding: 3px 8px; display:block; width: fit-content; background-color: var(--control-button-bg); color: var(--control-button-text); border: none; border-radius: var(--border-radius); cursor:pointer;" data-i18n-key="clearImageButton">清除图片</button>
 
       <div id="selectedTextPreview" style="display:none; font-style: italic; color: gray; padding: 5px; border: 1px dashed #ccc; margin-bottom: 5px;">
-        引用内容: <span id="selectedTextContent"></span>
-        <button id="clearSelectedTextButton" style="margin-left: 5px; font-size: 0.8em;">清除</button>
+        <span data-i18n-key="selectedTextPreviewLabel">引用内容:</span> <span id="selectedTextContent"></span>
+        <button id="clearSelectedTextButton" style="margin-left: 5px; font-size: 0.8em;" data-i18n-key="clearSelectedTextButton">清除</button>
       </div>
-      <textarea id="chatInput" placeholder="输入消息或使用快捷方式..."></textarea>
-      <button id="sendMessageButton">发送</button>
+      <textarea id="chatInput" data-i18n-key="chatInputPlaceholder" data-i18n-attr="placeholder"></textarea>
+      <button id="sendMessageButton" data-i18n-key="sendMessageButton">发送</button>
     </div>
     <div class="history-panel">
       <details class="history-actions-details">
-        <summary class="history-actions-summary">更多历史操作</summary>
-        <button id="clearAllHistoryButton">清除所有历史</button>
+        <summary class="history-actions-summary" data-i18n-key="moreHistoryActions">更多历史操作</summary>
+        <button id="clearAllHistoryButton" data-i18n-key="clearAllHistoryButton">清除所有历史</button>
       </details>
     </div>
   </div>
   <script src="/libs/marked.min.js"></script>
+  <script src="translations.js"></script>
   <script src="sidebar.js"></script>
 </body>
 </html>

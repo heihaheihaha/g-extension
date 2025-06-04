@@ -1,13 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>智能侧边栏API设置</title>
-  <meta charset="utf-8">
+  <title>智能侧边栏API设置</title> <meta charset="utf-8">
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 700px; margin: auto; font-size: 14px; }
     h1, h2 { text-align: center; }
     label { display: block; margin-bottom: 5px; font-weight: bold; }
-    input[type="text"], input[type="url"], select, textarea {
+    input[type="text"], input[type="password"], input[type="url"], select, textarea { /* Added password type */
       width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box;
       border: 1px solid #ccc; border-radius: 4px; font-size: 1em;
     }
@@ -36,49 +35,58 @@
     .hidden { display: none; }
   </style>
 </head>
-<body>
-  <h1>API 配置管理</h1>
+<body data-i18n-page-title-key="optionsHtmlTitle">
+  <h1 data-i18n-key="apiConfigManagement">API 配置管理</h1>
+
+  <div class="form-group">
+    <label for="languageSelect" data-i18n-key="languageSettingLabel">语言:</label>
+    <select id="languageSelect">
+      <option value="zh" data-i18n-key="languageZh">简体中文</option>
+      <option value="en" data-i18n-key="languageEn">English</option>
+    </select>
+  </div>
 
   <div class="config-form" id="configFormContainer">
-    <h2>添加/编辑配置</h2>
+    <h2 data-i18n-key="addEditConfig">添加/编辑配置</h2>
     <input type="hidden" id="configId">
     <div class="form-group">
-      <label for="configName">配置名称:</label>
-      <input type="text" id="configName" placeholder="例如：我的 Gemini 主力">
+      <label for="configName" data-i18n-key="configNameLabel">配置名称:</label>
+      <input type="text" id="configName" data-i18n-key="configNamePlaceholder" data-i18n-attr="placeholder">
     </div>
     <div class="form-group">
-      <label for="apiKey">API 密钥:</label>
-      <input type="password" id="apiKey" placeholder="粘贴您的 API 密钥">
+      <label for="apiKey" data-i18n-key="apiKeyLabel">API 密钥:</label>
+      <input type="password" id="apiKey" data-i18n-key="apiKeyPlaceholder" data-i18n-attr="placeholder">
     </div>
     <div class="form-group">
-      <label for="apiType">API 类型:</label>
+      <label for="apiType" data-i18n-key="apiTypeLabel">API 类型:</label>
       <select id="apiType">
-        <option value="gemini">Google Gemini</option>
-        <option value="openai">OpenAI 兼容 API</option>
+        <option value="gemini" data-i18n-key="apiTypeGemini">Google Gemini</option>
+        <option value="openai" data-i18n-key="apiTypeOpenAI">OpenAI 兼容 API</option>
       </select>
     </div>
     <div class="form-group hidden" id="apiEndpointGroup">
-      <label for="apiEndpoint">API Endpoint URL:</label>
-      <input type="url" id="apiEndpoint" placeholder="例如: https://api.openai.com/v1/chat/completions">
+      <label for="apiEndpoint" data-i18n-key="apiEndpointLabel">API Endpoint URL:</label>
+      <input type="url" id="apiEndpoint" data-i18n-key="apiEndpointPlaceholder" data-i18n-attr="placeholder">
     </div>
     <div class="form-group">
-      <label for="modelName">模型名称:</label>
-      <input type="text" id="modelName" placeholder="例如: gemini-1.5-flash-latest 或 gpt-4o">
+      <label for="modelName" data-i18n-key="modelNameLabel">模型名称:</label>
+      <input type="text" id="modelName" data-i18n-key="modelNamePlaceholder" data-i18n-attr="placeholder">
     </div>
-    <button id="saveConfigButton">保存配置</button>
-    <button type="button" id="clearFormButton">清空表单</button>
-    <button type="button" id="cancelEditButton" class="hidden">取消编辑</button>
+    <button id="saveConfigButton" data-i18n-key="saveConfigButton">保存配置</button>
+    <button type="button" id="clearFormButton" data-i18n-key="clearFormButton">清空表单</button>
+    <button type="button" id="cancelEditButton" class="hidden" data-i18n-key="cancelEditButton">取消编辑</button>
   </div>
 
   <div class="config-list">
-    <h2>已保存的配置</h2>
+    <h2 data-i18n-key="savedConfigsTitle">已保存的配置</h2>
     <div id="configurationsList">
-      <p>暂无配置。请添加一个新配置。</p>
+      <p data-i18n-key="noConfigsMessage">暂无配置。请添加一个新配置。</p>
     </div>
   </div>
-  
+
   <p id="status"></p>
 
+  <script src="translations.js"></script> 
   <script src="options.js"></script>
 </body>
 </html>

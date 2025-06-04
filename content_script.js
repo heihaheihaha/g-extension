@@ -9,6 +9,32 @@ let summarizeButtonInPreview = null;
 let closePreviewButton = null;
 let previewUrlElement = null;
 let previewTextElement = null;
+let previewHeaderTitleElement = null;
+let previewUrlLabelElement = null;
+let previewTextLabelElement = null;
+
+// Object to hold localized strings, fetched from background
+let csL10n = {
+    linkPreviewTitle: "Link Preview",
+    closePreviewButtonTitle: "Close Preview",
+    urlLabel: "URL:",
+    textLabel: "Text:",
+    summarizeButtonText: "Summarize Link"
+};
+
+// Request translations from background script on load
+chrome.runtime.sendMessage({ action: "getCsTranslations" }, (response) => {
+    if (chrome.runtime.lastError) {
+        console.error("CS: Error getting translations:", chrome.runtime.lastError.message);
+    } else if (response && response.translations) {
+        csL10n = response.translations;
+        // If preview window exists, update its text
+        if (previewWindow && previewWindow.style.display !== 'none') {
+            updatePreviewWindowText();
+        }
+    }
+});
+
 
 function injectPreviewStyles() {
     if (document.getElementById(PREVIEW_STYLE_ID)) {
@@ -42,7 +68,7 @@ function injectPreviewStyles() {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      cursor: grab; /* Allow moving the preview window */
+      cursor: grab; 
     }
     #${PREVIEW_WINDOW_ID} .preview-header-title {
       font-weight: bold;
@@ -67,17 +93,23 @@ function injectPreviewStyles() {
     }
     #${PREVIEW_WINDOW_ID} .preview-content p {
       margin: 0 0 8px 0;
+      display: flex; /* Align label and content */
+      align-items: baseline;
     }
-    #${PREVIEW_WINDOW_ID} .preview-content strong {
+    #${PREVIEW_WINDOW_ID} .preview-content strong { /* For labels */
       color: #555;
+      margin-right: 5px;
+      white-space: nowrap;
     }
     #${PREVIEW_WINDOW_ID} .preview-url-content-span,
     #${PREVIEW_WINDOW_ID} .preview-text-content-span {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      display: block;
+      display: inline-block; /* Changed from block */
       color: #0066cc;
+      flex-grow: 1; /* Allow content to take remaining space */
+      min-width: 0; /* Important for ellipsis to work in flex item */
     }
      #${PREVIEW_WINDOW_ID} .preview-text-content-span {
        color: #333;
@@ -104,6 +136,15 @@ function injectPreviewStyles() {
     document.head.appendChild(style);
 }
 
+function updatePreviewWindowText() {
+    if (!previewWindow) return;
+    if (previewHeaderTitleElement) previewHeaderTitleElement.textContent = csL10n.linkPreviewTitle;
+    if (closePreviewButton) closePreviewButton.title = csL10n.closePreviewButtonTitle;
+    if (previewUrlLabelElement) previewUrlLabelElement.textContent = csL10n.urlLabel;
+    if (previewTextLabelElement) previewTextLabelElement.textContent = csL10n.textLabel;
+    if (summarizeButtonInPreview) summarizeButtonInPreview.textContent = csL10n.summarizeButtonText;
+}
+
 function createPreviewWindow() {
     if (document.getElementById(PREVIEW_WINDOW_ID)) {
         previewWindow = document.getElementById(PREVIEW_WINDOW_ID);
@@ -111,6 +152,14 @@ function createPreviewWindow() {
         closePreviewButton = previewWindow.querySelector('.preview-close-btn');
         previewUrlElement = previewWindow.querySelector('.preview-url-content-span');
         previewTextElement = previewWindow.querySelector('.preview-text-content-span');
+        previewHeaderTitleElement = previewWindow.querySelector('.preview-header-title');
+        // Get label elements
+        const labels = previewWindow.querySelectorAll('.preview-content p strong');
+        if (labels.length >= 2) {
+            previewUrlLabelElement = labels[0];
+            previewTextLabelElement = labels[1];
+        }
+        updatePreviewWindowText(); // Apply initial translations
         return;
     }
 
@@ -120,15 +169,15 @@ function createPreviewWindow() {
     previewWindow.id = PREVIEW_WINDOW_ID;
     previewWindow.innerHTML = `
     <div class="preview-header">
-      <span class="preview-header-title">Link Preview</span>
-      <button class="preview-close-btn" title="Close Preview">&times;</button>
+      <span class="preview-header-title">${csL10n.linkPreviewTitle}</span>
+      <button class="preview-close-btn" title="${csL10n.closePreviewButtonTitle}">&times;</button>
     </div>
     <div class="preview-content">
-      <p><strong>URL:</strong> <span class="preview-url-content-span"></span></p>
-      <p><strong>Text:</strong> <span class="preview-text-content-span"></span></p>
+      <p><strong>${csL10n.urlLabel}</strong> <span class="preview-url-content-span"></span></p>
+      <p><strong>${csL10n.textLabel}</strong> <span class="preview-text-content-span"></span></p>
     </div>
     <div class="preview-actions">
-      <button class="summarize-link-btn-preview">Summarize Link</button>
+      <button class="summarize-link-btn-preview">${csL10n.summarizeButtonText}</button>
     </div>
   `;
     document.body.appendChild(previewWindow);
@@ -137,10 +186,16 @@ function createPreviewWindow() {
     closePreviewButton = previewWindow.querySelector('.preview-close-btn');
     previewUrlElement = previewWindow.querySelector('.preview-url-content-span');
     previewTextElement = previewWindow.querySelector('.preview-text-content-span');
+    previewHeaderTitleElement = previewWindow.querySelector('.preview-header-title');
+    const labels = previewWindow.querySelectorAll('.preview-content p strong');
+    if (labels.length >= 2) {
+        previewUrlLabelElement = labels[0];
+        previewTextLabelElement = labels[1];
+    }
+
 
     closePreviewButton.addEventListener('click', hidePreview);
 
-    // Make the preview window draggable by its header
     const header = previewWindow.querySelector('.preview-header');
     let isDraggingHeader = false;
     let offsetX, offsetY;
@@ -156,8 +211,7 @@ function createPreviewWindow() {
         if (isDraggingHeader) {
             previewWindow.style.left = `${e.clientX - offsetX}px`;
             previewWindow.style.top = `${e.clientY - offsetY}px`;
-            // Adjust if it goes off-screen, if necessary
-            previewWindow.style.right = 'auto'; // unset fixed right/bottom
+            previewWindow.style.right = 'auto'; 
             previewWindow.style.bottom = 'auto';
         }
     });
@@ -172,6 +226,7 @@ function createPreviewWindow() {
 
 function showPreview(linkElement) {
     if (!previewWindow) createPreviewWindow();
+    updatePreviewWindowText(); // Ensure text is updated with current l10n strings
 
     currentDraggedLink = linkElement;
     const url = linkElement.href;
@@ -183,21 +238,20 @@ function showPreview(linkElement) {
     previewTextElement.title = linkText;
 
     previewWindow.dataset.url = url;
-    previewWindow.dataset.title = linkText; // Store title for summary request
-    previewWindow.style.display = 'flex'; // Use flex for column layout
+    previewWindow.dataset.title = linkText; 
+    previewWindow.style.display = 'flex';
 
-    // Remove previous listener before adding a new one to avoid multiple triggers
     if (summarizeButtonInPreview._clickHandler) {
         summarizeButtonInPreview.removeEventListener('click', summarizeButtonInPreview._clickHandler);
     }
     summarizeButtonInPreview._clickHandler = () => {
         const targetUrl = previewWindow.dataset.url;
         const targetTitle = previewWindow.dataset.title;
-        console.log("Content Script: 'Summarize' clicked in preview for:", targetUrl);
+        // console.log("Content Script: 'Summarize' clicked in preview for:", targetUrl);
         chrome.runtime.sendMessage({
             action: 'summarizeLinkTarget',
             url: targetUrl,
-            linkText: targetTitle // Send link text for better context in sidebar
+            linkText: targetTitle 
         }, (response) => {
             if (chrome.runtime.lastError) {
                 console.error("Content Script: Error sending summarizeLinkTarget message:", chrome.runtime.lastError.message);
@@ -211,23 +265,17 @@ function showPreview(linkElement) {
 function hidePreview() {
     if (previewWindow) {
         previewWindow.style.display = 'none';
-         // Reset fixed position if it was changed by dragging
         previewWindow.style.bottom = '20px';
         previewWindow.style.right = '20px';
         previewWindow.style.left = 'auto';
         previewWindow.style.top = 'auto';
     }
     currentDraggedLink = null;
-    // It's good practice to remove the specific click handler if it captures variables from its creation scope
-    // but since we overwrite _clickHandler, it's less critical here.
 }
-
 
 document.addEventListener('dragstart', (event) => {
     const targetLink = event.target.closest('a');
     if (targetLink && targetLink.href && !targetLink.href.startsWith('javascript:')) {
-        // Allow native drag to proceed for things like dragging to tab bar or bookmarks
-        // event.preventDefault(); // Optional: uncomment if you want to completely override native drag for links
         try {
             event.dataTransfer.setData('text/uri-list', targetLink.href);
             event.dataTransfer.setData('text/plain', targetLink.href);
@@ -239,34 +287,32 @@ document.addEventListener('dragstart', (event) => {
 }, true);
 
 document.addEventListener('dragend', () => {
-    // Hide preview after a short delay to allow click on summarize button if drag ends quickly
     setTimeout(hidePreview, 1000);
 }, true);
 
-
-// Listener for messages FROM the background script (e.g., to get page content)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    // console.log("Content Script: Message received", request);
     if (request.action === 'getPageContentForSummarize') {
-        // console.log("Content Script: Action getPageContentForSummarize received.");
         try {
             const mainContent = document.body.innerText;
-            // console.log("Content Script: Sending page content for summary (length: " + (mainContent ? mainContent.length : 0) + ")");
             sendResponse({ contentForSummary: mainContent });
         } catch (e) {
             console.error("Content Script: Error getting document.body.innerText", e);
             sendResponse({ error: "Error accessing page content: " + e.message });
         }
-        return true; // Important for asynchronous sendResponse
+        return true; 
+    } else if (request.action === 'languageChanged') { // Listen for language changes
+        csL10n = request.translations;
+        if (previewWindow && previewWindow.style.display !== 'none') {
+            updatePreviewWindowText();
+        }
+        sendResponse({status: "cs language updated"});
     }
-    return true; // Keep true for async responses from other handlers if any
+    return true; 
 });
 
-// Listener for page text selection (to send TO background script)
 document.addEventListener('mouseup', () => {
     const selectedText = window.getSelection().toString().trim();
-    if (selectedText && !previewWindow?.contains(window.getSelection().anchorNode?.parentNode)) { // Don't trigger if selecting text within our preview
-        // console.log("Content Script: Text selected (length: " + selectedText.length + "), sending to background.");
+    if (selectedText && !previewWindow?.contains(window.getSelection().anchorNode?.parentNode)) { 
         chrome.runtime.sendMessage({ action: 'TEXT_SELECTED_FROM_PAGE', text: selectedText }, (response) => {
             if (chrome.runtime.lastError) {
                 console.error("Content Script: Error sending selected text to background:", chrome.runtime.lastError.message);
@@ -275,5 +321,5 @@ document.addEventListener('mouseup', () => {
     }
 });
 
-// Ensure preview elements are ready when the script loads
+// Ensure preview window is created on load so its elements are available
 createPreviewWindow();
