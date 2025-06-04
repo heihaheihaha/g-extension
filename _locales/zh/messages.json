@@ -1,0 +1,18 @@
+{
+  "extensionName": {
+    "message": "智能侧边栏助手",
+    "description": "扩展程序的名称。"
+  },
+  "extensionDescription": {
+    "message": "使用各类API总结网页、进行智能对话",
+    "description": "扩展程序的描述。"
+  },
+  "analyzeImageWithGeminiCM": {
+    "message": "用 Gemini 分析图片",
+    "description": "图片分析的右键菜单项。"
+  },
+  "openSidebarAction": {
+    "message": "打开智能侧边栏",
+    "description": "浏览器操作按钮标题。"
+  }
+}
