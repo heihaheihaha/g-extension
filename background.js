@@ -79,6 +79,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     });
     return true;
+  } else if (request.action === "extractActiveTabContent") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (!tabs || tabs.length === 0 || !tabs[0].id) {
+            sendResponse({ success: false, error: "无法确定活动标签页。" });
+            return;
+        }
+        const activeTabId = tabs[0].id;
+        const tabUrl = tabs[0].url;
+
+        // 检查是否为不支持的页面 (如 Chrome 网上商店, about:blank 等)
+        if (tabUrl.startsWith('chrome://') || tabUrl.startsWith('about:') || tabUrl.startsWith('https://chrome.google.com/webstore')) {
+           sendResponse({ success: false, error: "无法在此类特殊页面上运行脚本。" });
+           // 同时直接通知侧边栏
+           chrome.runtime.sendMessage({
+              type: "EXTRACT_CONTENT_ERROR",
+              message: "无法在此类特殊页面上运行脚本。"
+           });
+           return;
+        }
+
+        chrome.scripting.executeScript({
+            target: { tabId: activeTabId },
+            files: ["libs/Readability.js", "page_content_extractor.js"]
+        }, (injectionResults) => {
+            if (chrome.runtime.lastError) {
+                console.error("Background: 注入提取脚本时出错:", chrome.runtime.lastError.message);
+                sendResponse({ success: false, error: "无法注入提取脚本: " + chrome.runtime.lastError.message });
+                // 同时通知侧边栏
+                chrome.runtime.sendMessage({
+                    type: "EXTRACT_CONTENT_ERROR",
+                    message: "无法注入提取脚本: " + chrome.runtime.lastError.message
+                });
+            } else {
+                // 脚本将自行发送消息，因此这里只需确认注入已开始。
+                sendResponse({ success: true });
+            }
+        });
+    });
+    return true; // 异步
   } else if (request.action === "TEXT_SELECTED_FROM_PAGE") {
     // Forward message to sidebar (if open)
     chrome.runtime.sendMessage({ type: "TEXT_SELECTED_FOR_SIDEBAR", text: request.text });

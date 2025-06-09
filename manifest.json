@@ -45,6 +45,7 @@
         "prompts.html",
         "prompts.js",
         "prompts.css",
+        "page_content_extractor.js",
         "libs/*",
         "images/*"
       ],
