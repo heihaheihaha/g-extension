@@ -14,7 +14,7 @@ let currentSelectedImageUrl = null;
 let promptTemplates = [];
 
 // --- DOM 元素获取 ---
-let chatOutput, chatInput, sendMessageButton, summarizePageButton,
+let chatOutput, chatInput, sendMessageButton, summarizePageButton, extractContentButton,
     selectedTextPreview, selectedTextContent, clearSelectedTextButton,
     selectedImagePreviewContainer, clearSelectedImageButton,
     historyPanel, /* chatHistoryList, */ clearAllHistoryButton, // chatHistoryList removed from HTML
@@ -28,6 +28,7 @@ async function initialize() {
     chatInput = document.getElementById('chatInput');
     sendMessageButton = document.getElementById('sendMessageButton');
     summarizePageButton = document.getElementById('summarizePageButton');
+    extractContentButton = document.getElementById('extractContentButton');
     selectedTextPreview = document.getElementById('selectedTextPreview');
     selectedTextContent = document.getElementById('selectedTextContent');
     clearSelectedTextButton = document.getElementById('clearSelectedTextButton');
@@ -112,6 +113,7 @@ async function initialize() {
     }
 
     if (summarizePageButton) summarizePageButton.addEventListener('click', handleSummarizeCurrentPage); //
+    if (extractContentButton) extractContentButton.addEventListener('click', handleExtractContent);
     if (clearSelectedTextButton) clearSelectedTextButton.addEventListener('click', clearSelectedTextPreview); //
     if (clearSelectedImageButton) clearSelectedImageButton.addEventListener('click', clearSelectedImagePreview); //
 
@@ -383,48 +385,83 @@ function archiveQaPair(aiMessageIndexInCurrentChat) {
 
 
 function handleRuntimeMessages(request, sender, sendResponse) {
-    if (request.type === 'TEXT_SELECTED_FOR_SIDEBAR') {
-        currentSelectedText = request.text;
-        if (selectedTextContent) selectedTextContent.textContent = currentSelectedText.length > 100 ? currentSelectedText.substring(0, 97) + '...' : currentSelectedText;
-        if (selectedTextPreview) selectedTextPreview.style.display = 'flex';
-        sendResponse({status: "Selected text received in sidebar"});
-    } else if (request.type === 'IMAGE_SELECTED_FOR_SIDEBAR') {
-        currentSelectedImageUrl = request.imageUrl;
-        displaySelectedImagePreview(currentSelectedImageUrl);
-        sendResponse({status: "Image URL received in sidebar"});
-    } else if (request.type === 'SUMMARIZE_EXTERNAL_TEXT_FOR_SIDEBAR') {
-        const { text, linkUrl, linkTitle, warning } = request;
-        removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.includes("正在总结链接"));
+    // 使用 switch 语句使消息处理更清晰
+    switch (request.type || request.action) {
+        case 'TEXT_SELECTED_FOR_SIDEBAR':
+            currentSelectedText = request.text;
+            if (selectedTextContent) selectedTextContent.textContent = currentSelectedText.length > 100 ? currentSelectedText.substring(0, 97) + '...' : currentSelectedText;
+            if (selectedTextPreview) selectedTextPreview.style.display = 'flex';
+            sendResponse({status: "Selected text received in sidebar"});
+            break;
 
-        addMessageToChat({ role: 'user', parts: [{text: `总结请求：[${linkTitle || '链接'}](${linkUrl}) (内容长度: ${text?.length || 0})`}], timestamp: Date.now() });
-        if (warning) {
-            addMessageToChat({ role: 'model', parts: [{text: `注意: ${warning}`}], timestamp: Date.now() });
+        case 'IMAGE_SELECTED_FOR_SIDEBAR':
+            currentSelectedImageUrl = request.imageUrl;
+            displaySelectedImagePreview(currentSelectedImageUrl);
+            sendResponse({status: "Image URL received in sidebar"});
+            break;
+
+        case 'extractedPageContent': // from page_content_extractor.js
+            removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.includes('正在提取页面主要内容'));
+            if (request.error) {
+                addMessageToChat({ role: 'model', parts: [{text: `提取失败: ${request.error}${request.warning ? ' ('+request.warning+')' : ''}`}], timestamp: Date.now() });
+            } else {
+                currentSelectedText = request.content;
+                if (selectedTextPreview && selectedTextContent) {
+                    selectedTextContent.textContent = `已提取页面内容 (字数: ${currentSelectedText.length})`;
+                    selectedTextPreview.style.display = 'flex';
+                }
+                const successMsgText = `✅ 提取成功 (字数: ${request.content.length})` + (request.warning ? ` (${request.warning})` : '');
+                const successMsg = addMessageToChat({ role: 'model', parts: [{text: successMsgText}], timestamp: Date.now(), isTempStatus: true });
+                setTimeout(() => removeMessageByContentCheck(msg => msg.timestamp === successMsg.timestamp), 6000);
+            }
+            sendResponse({status: "Page content processed"});
+            break;
+
+        case 'EXTRACT_CONTENT_ERROR': // from background.js for special pages
+            removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.includes('正在提取页面主要内容'));
+            addMessageToChat({ role: 'model', parts: [{text: `提取失败: ${request.message}`}], timestamp: Date.now() });
+            sendResponse({status: "Error notice displayed"});
+            break;
+
+        case 'SUMMARIZE_EXTERNAL_TEXT_FOR_SIDEBAR': {
+            const { text, linkUrl, linkTitle, warning } = request;
+            removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.includes("正在总结链接"));
+            addMessageToChat({ role: 'user', parts: [{text: `总结请求：[${linkTitle || '链接'}](${linkUrl}) (内容长度: ${text?.length || 0})`}], timestamp: Date.now() });
+            if (warning) {
+                addMessageToChat({ role: 'model', parts: [{text: `注意: ${warning}`}], timestamp: Date.now() });
+            }
+            if (!text || text.trim() === "") {
+                addMessageToChat({role: 'model', parts: [{text: `无法总结 [${linkTitle || linkUrl}](${linkUrl})，未能提取到有效文本。`}], timestamp: Date.now() });
+                sendResponse({error: "No text provided"});
+            } else {
+                const prompt = `请使用中文，清晰、简洁且全面地总结以下链接 (${linkTitle ? linkTitle + ' - ' : ''}${linkUrl}) 的主要内容。专注于核心信息，忽略广告、导航栏、页脚等非主要内容。如果内容包含技术信息或代码，请解释其核心概念和用途。如果是一篇文章，请提炼主要观点和论据。总结应易于理解，并抓住内容的精髓。\n\n链接内容文本如下：\n"${text}"`;
+                callApi(prompt, true, null).then(() => sendResponse({status: "Summary initiated"})); // Ensure callApi is used
+            }
+            break;
         }
-        if (!text || text.trim() === "") {
-            addMessageToChat({role: 'model', parts: [{text: `无法总结 [${linkTitle || linkUrl}](${linkUrl})，未能提取到有效文本。`}], timestamp: Date.now() });
-            sendResponse({error: "No text provided"});
-            return true; // Keep channel open for async
+
+        case 'SHOW_LINK_SUMMARY_ERROR': {
+            const { message, url, title } = request;
+            removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.includes("正在总结链接"));
+            addMessageToChat({ role: 'model', parts: [{text: `总结链接 [${title || url}](${url}) 失败: ${message}`}], timestamp: Date.now() });
+            sendResponse({status: "Error displayed"});
+            break;
         }
-        const prompt = `请使用中文，清晰、简洁且全面地总结以下链接 (${linkTitle ? linkTitle + ' - ' : ''}${linkUrl}) 的主要内容。专注于核心信息，忽略广告、导航栏、页脚等非主要内容。如果内容包含技术信息或代码，请解释其核心概念和用途。如果是一篇文章，请提炼主要观点和论据。总结应易于理解，并抓住内容的精髓。\n\n链接内容文本如下：\n"${text}"`;
-        callApi(prompt, true, null).then(() => sendResponse({status: "Summary initiated"})); // Ensure callApi is used
 
-    } else if (request.type === 'SHOW_LINK_SUMMARY_ERROR') {
-        const { message, url, title } = request;
-        removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.includes("正在总结链接"));
-        addMessageToChat({ role: 'model', parts: [{text: `总结链接 [${title || url}](${url}) 失败: ${message}`}], timestamp: Date.now() });
-        sendResponse({status: "Error displayed"});
+        case 'LINK_SUMMARIZATION_STARTED': {
+            const { url, title } = request;
+            removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.includes("正在总结链接"));
+            addMessageToChat({ role: 'model', parts: [{text: `正在总结链接: [${title || url}](${url})... 请稍候。`}], timestamp: Date.now(), isTempStatus: true });
+            sendResponse({status: "Notified user"});
+            break;
+        }
 
-    } else if (request.type === 'LINK_SUMMARIZATION_STARTED') {
-        const { url, title } = request;
-        removeMessageByContentCheck(msg => msg.isTempStatus && msg.parts[0].text.includes("正在总结链接"));
-        addMessageToChat({ role: 'model', parts: [{text: `正在总结链接: [${title || url}](${url})... 请稍候。`}], timestamp: Date.now(), isTempStatus: true });
-        sendResponse({status: "Notified user"});
-
-    } else if (request.type === "TRIGGER_SIDEBAR_PAGE_SUMMARY") {
-        handleSummarizeCurrentPage();
-        sendResponse({ status: "Sidebar initiated page summary." });
+        case 'TRIGGER_SIDEBAR_PAGE_SUMMARY':
+            handleSummarizeCurrentPage();
+            sendResponse({ status: "Sidebar initiated page summary." });
+            break;
     }
-    return true; // Important for asynchronous sendResponse
+    return true; // 对异步 sendResponse 很重要
 }
 
 function removeMessageByContentCheck(conditionFn) {
@@ -547,11 +584,32 @@ function handleSummarizeCurrentPage() {
     });
 }
 
+function handleExtractContent() {
+    if (!currentApiKey) { // Use API key check as a proxy for "is extension configured"
+        addMessageToChat({ role: 'model', parts: [{text: '错误：API 配置不完整。请检查插件选项。'}], timestamp: Date.now() });
+        disableInputs();
+        return;
+    }
+    
+    const tempStatusMsg = addMessageToChat({role: 'model', parts: [{text: '正在提取页面主要内容...'}], timestamp: Date.now(), isTempStatus: true });
+
+    chrome.runtime.sendMessage({ action: "extractActiveTabContent" }, (response) => {
+        // 这个回调主要处理来自 background 脚本的即时错误，比如注入失败。
+        // 实际内容会通过另一条消息返回。
+        if (chrome.runtime.lastError || (response && !response.success)) {
+            removeMessageByContentCheck(msg => msg.timestamp === tempStatusMsg.timestamp);
+            const errorMessage = response?.error || chrome.runtime.lastError?.message || "未知错误";
+            addMessageToChat({role: 'model', parts: [{text: `提取失败: ${errorMessage}`}], timestamp: Date.now() });
+        }
+    });
+}
+
 
 function disableInputs() {
     if (chatInput) chatInput.disabled = true;
     if (sendMessageButton) sendMessageButton.disabled = true;
     if (summarizePageButton) summarizePageButton.disabled = true;
+    if (extractContentButton) extractContentButton.disabled = true;
     if (splitChatButton) splitChatButton.disabled = true;
     // Allow managing prompts even if API is not set
     // if (managePromptsButton) managePromptsButton.disabled = true;
@@ -561,6 +619,7 @@ function enableInputs() {
     if (chatInput) chatInput.disabled = false;
     if (sendMessageButton) sendMessageButton.disabled = false;
     if (summarizePageButton) summarizePageButton.disabled = false;
+    if (extractContentButton) extractContentButton.disabled = false;
     if (splitChatButton) splitChatButton.disabled = false;
     // if (managePromptsButton) managePromptsButton.disabled = false;
 }

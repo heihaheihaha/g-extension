@@ -56,13 +56,13 @@ body {
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding-bottom: 12px;
+  gap: 4px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .controls button {
-  padding: 8px 12px;
+  padding: 6px 10px;
   flex-grow: 1;
   min-width: 120px;
   border: none;
@@ -70,7 +70,7 @@ body {
   color: var(--control-button-text);
   cursor: pointer;
   border-radius: var(--border-radius);
-  font-size: 0.9em;
+  font-size: 0.85em;
   transition: background-color 0.15s ease-in-out;
   text-align: center;
 }
