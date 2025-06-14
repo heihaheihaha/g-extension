@@ -855,11 +855,10 @@ function renderCurrentChat() {
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('message', msg.role === 'user' ? 'user' : 'ai');
         if (msg.isTempStatus) messageDiv.classList.add('temporary-status');
-        if (msg.isThinking) messageDiv.classList.add('thinking-status'); // This could be a specific class for styling
+        if (msg.isThinking) messageDiv.classList.add('thinking-status');
 
         let contentHtml = '';
-        // Ensure msg.parts[0] and msg.parts[0].text exist and are strings
-        const textContent = (msg.parts && msg.parts[0] && typeof msg.parts[0].text === 'string') ? msg.parts[0].text : "内容不可用";
+        const textContent = (msg.parts && msg.parts[0] && typeof msg.parts[0].text === 'string') ? msg.parts[0].text : "";
 
         if (msg.role === 'model' && typeof marked !== 'undefined' && typeof marked.parse === 'function' && !msg.isTempStatus && !msg.isThinking) {
             try {
@@ -883,24 +882,52 @@ function renderCurrentChat() {
         const timestampSpan = document.createElement('span');
         timestampSpan.classList.add('timestamp');
         timestampSpan.textContent = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        footerDiv.appendChild(timestampSpan);
+        
+        const actionsContainer = document.createElement('div');
+        actionsContainer.classList.add('message-actions');
+
+        // Always add copy button for non-transient messages
+        if (!msg.isThinking && !msg.isTempStatus && textContent) {
+            const copyElement = document.createElement('span');
+            copyElement.classList.add('copy-action');
+            copyElement.innerHTML = '&#x1F4CB;'; // Clipboard icon 📋
+            copyElement.title = '复制内容';
+            copyElement.onclick = (e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(textContent).then(() => {
+                    copyElement.textContent = '✅';
+                    copyElement.title = '已复制!';
+                    setTimeout(() => {
+                        copyElement.innerHTML = '&#x1F4CB;';
+                        copyElement.title = '复制内容';
+                    }, 1500);
+                }).catch(err => {
+                    console.error('Failed to copy text: ', err);
+                });
+            };
+            actionsContainer.appendChild(copyElement);
+        }
 
         if (msg.role === 'model' && !msg.isThinking && !msg.isTempStatus && !msg.archived) {
             const archiveElement = document.createElement('span');
-            archiveElement.classList.add('archive-action', 'archive-icon');
-            archiveElement.innerHTML = '&#x1F4C1;'; // Folder icon
+            archiveElement.classList.add('archive-action');
+            archiveElement.innerHTML = '&#x1F4C1;'; // Folder icon 📁
             archiveElement.title = '存档此问答';
             archiveElement.onclick = (e) => {
                 e.stopPropagation();
                 archiveQaPair(index);
             };
-            footerDiv.appendChild(archiveElement);
+            actionsContainer.appendChild(archiveElement);
         } else if (msg.archived) {
             const archivedTextSpan = document.createElement('span');
             archivedTextSpan.classList.add('archived-text');
             archivedTextSpan.textContent = '已存档';
-            footerDiv.appendChild(archivedTextSpan);
+            actionsContainer.appendChild(archivedTextSpan);
         }
+
+        footerDiv.appendChild(timestampSpan);
+        footerDiv.appendChild(actionsContainer);
+
         messageDiv.appendChild(footerDiv);
         chatOutput.appendChild(messageDiv);
     });
