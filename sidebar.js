@@ -17,7 +17,7 @@ let promptTemplates = [];
 let chatOutput, chatInput, sendMessageButton, summarizePageButton, extractContentButton,
     selectedTextPreview, selectedTextContent, clearSelectedTextButton,
     selectedImagePreviewContainer, clearSelectedImageButton,
-    historyPanel, /* chatHistoryList, */ clearAllHistoryButton, // chatHistoryList removed from HTML
+    clearAllHistoryButton, // historyPanel removed
     splitChatButton, viewArchivedChatsButton,
     managePromptsButton, promptShortcutsContainer;
 
@@ -34,8 +34,6 @@ async function initialize() {
     clearSelectedTextButton = document.getElementById('clearSelectedTextButton');
     selectedImagePreviewContainer = document.getElementById('selectedImagePreviewContainer');
     clearSelectedImageButton = document.getElementById('clearSelectedImageButton');
-    historyPanel = document.querySelector('.history-panel');
-    // chatHistoryList = document.getElementById('chatHistoryList'); // This was removed from HTML
     clearAllHistoryButton = document.getElementById('clearAllHistoryButton');
     splitChatButton = document.getElementById('splitChatButton');
     viewArchivedChatsButton = document.getElementById('viewArchivedChatsButton');
@@ -73,8 +71,9 @@ async function initialize() {
             
             // Basic validation of the loaded active config
             if (!currentApiKey || !currentModelName || (currentApiType === 'openai' && !currentApiEndpoint)) {
-                 addMessageToChat({ role: 'model', parts: [{text: '错误：当前活动的API配置不完整。请检查插件选项。'}], timestamp: Date.now() }); //
-                 disableInputs(); //
+                 const errorText = '错误：当前活动的API配置不完整。请<a href="#" id="open-options-link">检查插件选项</a>。';
+                 addMessageToChat({ role: 'model', parts: [{text: errorText}], timestamp: Date.now() }); 
+                 disableInputs(); 
             } else {
                 // Add a temporary status message that will be removed.
                 const tempStatusMsg = addMessageToChat({ role: 'model', parts: [{text: `已加载配置: "${activeConfig.configName}" (${activeConfig.apiType})`}], timestamp: Date.now(), isTempStatus: true }); //
@@ -82,7 +81,8 @@ async function initialize() {
                 enableInputs(); //
             }
         } else {
-            addMessageToChat({ role: 'model', parts: [{text: '错误：未找到任何API配置或未设置活动配置。请在插件选项中添加并设置一个活动配置。'}], timestamp: Date.now() }); //
+            const errorText = '错误：未找到任何API配置或未设置活动配置。请<a href="#" id="open-options-link">在插件选项中添加并设置一个活动配置</a>。';
+            addMessageToChat({ role: 'model', parts: [{text: errorText}], timestamp: Date.now() }); 
             disableInputs(); //
         }
 
@@ -124,7 +124,6 @@ async function initialize() {
                 allChats = []; //
                 currentChat = []; //
                 saveChatHistory(); // This will save empty allChats //
-                // renderChatHistoryList(); // No longer needed as list display is removed
                 renderCurrentChat(); // Clears the current chat display //
                 addMessageToChat({ role: 'model', parts: [{text: '所有对话历史已清除。'}], timestamp: Date.now() }); //
             }
@@ -172,8 +171,9 @@ async function initialize() {
 
                 // Re-validate and enable/disable inputs
                 if (!currentApiKey || !currentModelName || (currentApiType === 'openai' && !currentApiEndpoint)) { //
-                    addMessageToChat({ role: 'model', parts: [{text: '错误：新的活动API配置不完整。请检查插件选项。'}], timestamp: Date.now() }); //
-                    disableInputs(); //
+                    const errorText = '错误：新的活动API配置不完整。请<a href="#" id="open-options-link">检查插件选项</a>。';
+                    addMessageToChat({ role: 'model', parts: [{text: errorText}], timestamp: Date.now() }); 
+                    disableInputs(); 
                 } else {
                     enableInputs(); //
                 }
@@ -875,6 +875,14 @@ function renderCurrentChat() {
         contentWrapper.classList.add('message-content-wrapper');
         contentWrapper.innerHTML = contentHtml;
         messageDiv.appendChild(contentWrapper);
+        
+        const optionsLink = contentWrapper.querySelector('#open-options-link');
+        if (optionsLink) {
+            optionsLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                chrome.runtime.openOptionsPage();
+            });
+        }
 
         const footerDiv = document.createElement('div');
         footerDiv.classList.add('message-footer');

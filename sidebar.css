@@ -285,9 +285,15 @@ body {
   box-shadow: var(--input-focus-shadow);
 }
 
+.send-area-container {
+    display: flex;
+    gap: 8px;
+    align-items: stretch; /* Make buttons same height */
+}
+
 #sendMessageButton {
   padding: 10px 15px;
-  width: 100%;
+  flex-grow: 1; /* Take available space */
   background-color: var(--primary-button-bg);
   color: var(--primary-button-text);
   border: none;
@@ -304,131 +310,23 @@ body {
   cursor: not-allowed;
 }
 
-
-.history-panel {
-  border-top: 1px solid var(--border-color);
-  padding-top: 8px; /* Reduced padding as list is gone */
-  /* max-height: 30%; */ /* Not strictly needed for just a button area */
-  /* overflow-y: auto; */ /* Not needed if content doesn't overflow */
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background-color: #ffffff;
-  padding: 10px; /* Keep some padding for the panel itself */
-  border-radius: var(--border-radius);
-  box-shadow: 0 -1px 5px rgba(0,0,0,0.03);
-}
-
-.history-actions-details {
-  width: 100%;
-}
-
-.history-actions-summary {
-  padding: 6px 10px;
-  cursor: pointer;
-  background-color: var(--hover-bg-color);
-  border-radius: var(--border-radius);
-  font-size: 0.9em;
-  color: var(--secondary-text-color);
-  text-align: center;
-  list-style: none; /* Remove default marker */
-  transition: background-color 0.15s ease-in-out;
-}
-.history-actions-summary::-webkit-details-marker { /* For Chrome/Safari */
-  display: none;
-}
-.history-actions-summary::marker { /* For Firefox */
- content: "";
-}
-
-
-.history-actions-summary:hover {
-  background-color: var(--active-bg-color);
-}
-
-.history-actions-details[open] .history-actions-summary {
-  margin-bottom: 8px; /* Add some space when open */
-}
-
-
-#chatHistoryList {
-  /* This div is now removed from HTML, styles can be removed or commented out */
-  /* overflow-y: auto; */
-  /* flex-grow: 1; */
-}
-
-.history-item {
-  /* This class is no longer used, styles can be removed or commented out */
-  /* padding: 10px 12px;
-  border-bottom: 1px solid var(--border-color);
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: background-color 0.15s ease-in-out;
-  border-radius: 4px; */
-}
-/* .history-item:last-child {
-  border-bottom: none;
-}
-.history-item:hover {
-  background-color: var(--hover-bg-color);
-} */
-
-.history-item-title {
-   /* This class is no longer used, styles can be removed or commented out */
-  /* flex-grow: 1;
-  margin-right: 10px;
-  font-size: 0.9em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--secondary-text-color); */
-}
-/* .history-item:hover .history-item-title {
-    color: var(--primary-text-color);
-} */
-
-
-.history-item-buttons button {
-   /* This class is no longer used, styles can be removed or commented out */
-  /* margin-left: 5px;
-  padding: 4px 8px;
-  font-size: 0.8em;
-  cursor: pointer;
-  border: 1px solid var(--border-color);
-  background-color: #fff;
-  border-radius: var(--border-radius);
-  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
-  color: var(--secondary-text-color); */
-}
-/* .history-item-buttons button.archive-btn:hover {
-  background-color: #e6f7ff;
-  border-color: #91d5ff;
-  color: #0056b3;
-}
-.history-item-buttons button.delete-btn:hover {
-  background-color: #fff5f5;
-  border-color: #ffccc7;
-  color: #dc3545;
-} */
-
-
 #clearAllHistoryButton {
-  display: block;
-  width: 100%;
-  /* margin-top: 8px; */ /* Now controlled by details[open] summary margin */
-  padding: 9px 12px;
+  flex-shrink: 0; /* Prevent shrinking */
+  padding: 8px 12px;
+  background-color: transparent;
+  color: var(--destructive-button-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  font-size: 1.1em;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+}
+
+#clearAllHistoryButton:hover {
   background-color: var(--destructive-button-bg);
   color: var(--destructive-button-text);
-  border: none;
-  border-radius: var(--border-radius);
-  font-size: 0.9em;
-  text-align: center;
-  transition: background-color 0.15s ease-in-out;
-}
-#clearAllHistoryButton:hover {
-  background-color: var(--destructive-button-hover-bg);
+  border-color: var(--destructive-button-bg);
 }
 
 .temporary-status {
@@ -441,30 +339,22 @@ body {
 }
 
 /* Scrollbar styling (optional, browser-specific) */
-#chatOutput::-webkit-scrollbar,
-.history-panel::-webkit-scrollbar,
-#chatHistoryList::-webkit-scrollbar { /* chatHistoryList might no longer scroll, but keep for .history-panel if it might grow */
+#chatOutput::-webkit-scrollbar {
   width: 8px;
 }
 
-#chatOutput::-webkit-scrollbar-track,
-.history-panel::-webkit-scrollbar-track,
-#chatHistoryList::-webkit-scrollbar-track {
+#chatOutput::-webkit-scrollbar-track {
   background: transparent;
 }
 
-#chatOutput::-webkit-scrollbar-thumb,
-.history-panel::-webkit-scrollbar-thumb,
-#chatHistoryList::-webkit-scrollbar-thumb {
+#chatOutput::-webkit-scrollbar-thumb {
   background-color: var(--border-color);
   border-radius: 10px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
-#chatOutput::-webkit-scrollbar-thumb:hover,
-.history-panel::-webkit-scrollbar-thumb:hover,
-#chatHistoryList::-webkit-scrollbar-thumb:hover {
+#chatOutput::-webkit-scrollbar-thumb:hover {
   background-color: var(--light-text-color);
 }
 

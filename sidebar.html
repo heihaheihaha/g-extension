@@ -34,15 +34,12 @@
         <button id="clearSelectedTextButton" style="margin-left: 5px; font-size: 0.8em;">清除</button>
       </div>
       <textarea id="chatInput" placeholder="输入消息或使用快捷方式..."></textarea>
-      <button id="sendMessageButton">发送</button>
+      <div class="send-area-container">
+        <button id="sendMessageButton">发送</button>
+        <button id="clearAllHistoryButton" title="清除所有历史">🗑️</button>
+      </div>
     </div>
-    <div class="history-panel">
-      <details class="history-actions-details">
-        <summary class="history-actions-summary">更多历史操作</summary>
-        <button id="clearAllHistoryButton">清除所有历史</button>
-      </details>
     </div>
-  </div>
   <script src="/libs/marked.min.js"></script>
   <script src="sidebar.js"></script>
 </body>
